@@ -11,6 +11,7 @@ describe("graded heap elevations and physical repose", () => {
     (drainageDirection) => {
       const p = {
         ...defaults,
+        stackingMode: "lifts" as const,
         drainageDirection,
         drainageGrade: degreesToGrade(2),
         slope: 0.5,

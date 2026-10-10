@@ -47,7 +47,8 @@ describe("continuous pile sizing", () => {
     (aspectRatio) => {
       const p = {
         ...defaults,
-        oreTonnes: 1600,
+        oreTonnes: 1800,
+        slope: 2,
         aspectRatio,
         stackingMode: "continuous" as const,
       };
@@ -101,7 +102,7 @@ describe("continuous pile sizing", () => {
 });
 describe("CAD geometry", () => {
   it("exports each cell and lift on separate CAD layers", () => {
-    const d = designDrawing(defaults);
+    const d = designDrawing({ ...defaults, stackingMode: "lifts", slope: 3 });
     const layers = new Set(d.faces.map((f) => f.layer));
     expect(layers.has("HEAP_A1_L1")).toBe(true);
     expect(layers.has("HEAP_B4_L2")).toBe(true);
@@ -140,19 +141,17 @@ describe("CAD geometry", () => {
     expect(Math.min(...ground.map((p) => p[2]))).toBe(0);
   });
   it("exports the design mesh at true scale with north/up axes and metric units", () => {
-    const drawing = designDrawing(defaults),
+    const p = { ...defaults, stackingMode: "lifts" as const, slope: 3 };
+    const drawing = designDrawing(p),
       dxf = drawingDxf(drawing);
     const points = drawing.faces.flatMap((f) => f.vertices);
-    expect(Math.max(...points.map((p) => p[0]))).toBe(defaults.length);
-    expect(Math.min(...points.map((p) => p[1]))).toBe(-defaults.width);
+    expect(Math.max(...points.map((p) => p[0]))).toBe(p.length);
+    expect(Math.min(...points.map((p) => p[1]))).toBe(-p.width);
     expect(Math.max(...points.map((p) => p[2]))).toBeCloseTo(
-      defaults.maxHeight +
-        (defaults.drainageGrade *
-          (defaults.width - defaults.slope * defaults.maxHeight)) /
-          100,
+      p.maxHeight + (p.drainageGrade * (p.width - p.slope * p.maxHeight)) / 100,
       6,
     );
-    expect(cadVolume(drawing)).toBeCloseTo(heapDesign(defaults).volume, 5);
+    expect(cadVolume(drawing)).toBeCloseTo(heapDesign(p).volume, 5);
     expect(dxf).toContain("$INSUNITS\n70\n6\n");
     expect(dxf.match(/\n3DFACE\n/g)).toHaveLength(drawing.faces.length);
   });

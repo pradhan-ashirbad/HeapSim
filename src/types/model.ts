@@ -3,6 +3,7 @@ import { z } from "zod";
 const positive = z.number().finite().positive();
 const nonnegative = z.number().finite().nonnegative();
 const optionalNumber = nonnegative.nullable();
+const oneDegreeDrainageGrade = Math.tan(Math.PI / 180) * 100;
 export const inputsSchema = z
   .object({
     projectName: z.string().min(1).max(100),
@@ -29,8 +30,13 @@ export const inputsSchema = z
     maxHeight: positive.max(200),
     maxLifts: z.number().int().min(1).max(20),
     slope: nonnegative.max(10),
-    reposeAngle: z.number().finite().min(1).max(90).default(37),
-    drainageGrade: z.number().finite().min(0).max(10).default(2),
+    reposeAngle: z.number().finite().min(1).max(90).default(37.5),
+    drainageGrade: z
+      .number()
+      .finite()
+      .min(0)
+      .max(10)
+      .default(oneDegreeDrainageGrade),
     drainageDirection: z
       .enum(["south", "north", "east", "west"])
       .default("south"),
@@ -267,9 +273,9 @@ export interface SimulationSnapshot {
 export const defaults: ProjectInputs = {
   projectName: "Aurora · 3 Mt development plan",
   scenario: "permanent",
-  stackingMode: "lifts",
+  stackingMode: "continuous",
   oreTonnes: 3_000_000,
-  density: 1.6,
+  density: 1.8,
   oreType: "Primary oxide ore",
   goldGrade: null,
   recovery: null,
@@ -288,9 +294,9 @@ export const defaults: ProjectInputs = {
   liftHeight: 10,
   maxHeight: 40,
   maxLifts: 4,
-  slope: 3,
-  reposeAngle: 37,
-  drainageGrade: 2,
+  slope: 1,
+  reposeAngle: 37.5,
+  drainageGrade: oneDegreeDrainageGrade,
   drainageDirection: "south",
   sizingMode: "fixed-land",
   aspectRatio: 4 / 3,

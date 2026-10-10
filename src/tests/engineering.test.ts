@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  defaults,
+  defaults as initialDefaults,
   inputsSchema,
   type ProjectInputs,
   type Scenario,
@@ -31,6 +31,15 @@ import {
 } from "@/engine/simulation";
 import { runSensitivity } from "@/engine/sensitivity";
 
+// Fixed-land lift fixture keeps the scheduling geometry independent of new UI defaults.
+const defaults: ProjectInputs = {
+  ...initialDefaults,
+  stackingMode: "lifts",
+  density: 1.6,
+  slope: 3,
+  reposeAngle: 37,
+  drainageGrade: 2,
+};
 const approved = {
   ...defaults,
   geotech: true,
@@ -59,6 +68,19 @@ const small: ProjectInputs = {
   irrigationCapacity: 1000,
 };
 describe("engineering geometry", () => {
+  it("starts with the requested single-pile design inputs", () => {
+    expect(initialDefaults.scenario).toBe("permanent");
+    expect(initialDefaults.stackingMode).toBe("continuous");
+    expect(initialDefaults.density).toBe(1.8);
+    expect(initialDefaults.reposeAngle).toBe(37.5);
+    expect(
+      (Math.atan(initialDefaults.drainageGrade / 100) * 180) / Math.PI,
+    ).toBeCloseTo(1, 12);
+    expect(initialDefaults.liftHeight).toBe(10);
+    const r = simulate({ ...initialDefaults, oreTonnes: 100000 });
+    expect(r.segments.every((s) => s.lift === 1)).toBe(true);
+    expect(r.inputs.length).not.toBe(initialDefaults.length);
+  });
   it("converts 3 Mt to 1,875,000 m³", () =>
     expect(oreVolume(3_000_000, 1.6)).toBe(1_875_000));
   it("gives an unclipped interior cell 40,000 t", () =>

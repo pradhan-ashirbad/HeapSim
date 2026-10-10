@@ -7,9 +7,18 @@ test("live no-lift sizing reshapes geometry and exports real CAD", async ({
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
-  await page
-    .getByLabel("Permanent heap construction")
-    .selectOption("continuous");
+  await expect(page.getByLabel("Permanent heap construction")).toHaveValue(
+    "continuous",
+  );
+  await expect(
+    page.getByLabel("Stacked bulk density", { exact: true }),
+  ).toHaveValue("1.8");
+  await expect(
+    page.getByLabel("Ore angle of repose", { exact: true }),
+  ).toHaveValue("37.5");
+  await expect(
+    page.getByLabel("Drainage tilt (degrees)", { exact: true }),
+  ).toHaveValue("1");
   const design = page.getByTestId("design-preview");
   await expect(
     page.getByRole("heading", { name: "Single pile · no lifts" }),
@@ -21,7 +30,7 @@ test("live no-lift sizing reshapes geometry and exports real CAD", async ({
   // No blur or Enter: valid edits must update the geometry themselves.
   await expect
     .poll(async () => Number(await design.getAttribute("data-volume")))
-    .toBeCloseTo(625000, 2);
+    .toBeCloseTo(1000000 / 1.8, 2);
   expect(Number(await design.getAttribute("data-width"))).toBeLessThan(
     initialWidth,
   );
@@ -82,6 +91,8 @@ test("real 3D geometry, synchronized selection, playback and reverse scrubbing",
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
+  await page.getByLabel("Permanent heap construction").selectOption("lifts");
+  await page.getByLabel("Overall side slope", { exact: true }).fill("3");
   await expect(page.getByLabel("Simulation day")).toBeVisible();
   await expect(page.locator(".visualization canvas")).toBeVisible();
   await page.getByRole("button", { name: "Split view", exact: true }).click();
@@ -150,6 +161,8 @@ test("approved inputs enable retained upper lifts and engineering sensitivity ru
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
+  await page.getByLabel("Permanent heap construction").selectOption("lifts");
+  await page.getByLabel("Overall side slope", { exact: true }).fill("3");
   await expect(page.getByLabel("Simulation day")).toBeVisible();
   await page
     .locator("summary")
@@ -352,6 +365,7 @@ test("viewer exports graded DWG and displays editable two-degree elevations", as
   page,
 }) => {
   await page.goto("/");
+  await page.getByLabel("Permanent heap construction").selectOption("lifts");
   await page.getByLabel("Drainage tilt (degrees)", { exact: true }).fill("2");
   const profile = page.getByTestId("drainage-profile");
   await expect
