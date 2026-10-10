@@ -4,7 +4,7 @@ A browser-based gold heap-leach planning application with a deterministic daily 
 
 ## Run locally
 
-Node.js 22.13+ (Node 24 recommended) and npm are required. Dependencies are locked in `package-lock.json`.
+Node.js 24.x and npm are required. Dependencies are locked in `package-lock.json`.
 
 ```sh
 npm ci
@@ -21,6 +21,12 @@ npm run start
 Do not run a production build while the development server is serving browser tests: both use `.next` assets. Stop the development server first. No database, API keys, remote fonts or application services are required. Project assumptions and up to 20 named saves persist in the browser's localStorage; clearing browser storage removes them. Export JSON to keep portable copies.
 
 In the cloud workspace, use the existing `/workspace/HeapSim` checkout. Each task is already isolated; do not create a Git worktree unless explicitly requested. If the default npm cache is unwritable, run `npm ci --cache /workspace/.npm-cache`.
+
+## Deploy on Vercel
+
+Import this repository with the repository root as the project's Root Directory. The committed `vercel.json` selects the Next.js framework, runs `npm run build`, and sets `.next` as the output directory, overriding a stale `public` output setting. Node.js is pinned to 24.x in `package.json`, matching CI.
+
+For matching dashboard settings, select **Next.js** as the Framework Preset and remove any **Output Directory** override set to `public`. Deploy the latest `main` commit after changing settings; retrying an older deployment uses its original source configuration. No environment variables are required.
 
 ## Operating the application
 
