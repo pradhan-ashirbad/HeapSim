@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useProject } from "@/store/use-project";
 import { heapDesign } from "@/engine/design";
 import { number } from "@/utils/format";
+import { drainageProfile } from "@/engine/drainage";
 import { CadExport } from "./cad-export";
 const DesignScene = dynamic(() => import("@/components/three-d/design-scene"), {
   ssr: false,
@@ -18,6 +19,7 @@ export function DesignPanel() {
     gl?.getExtension("WEBGL_lose_context")?.loseContext();
   }, []);
   const p = design.inputs;
+  const drainage = drainageProfile(p);
   return (
     <section className="design-panel" aria-label="Live pile design">
       <header>
@@ -51,10 +53,15 @@ export function DesignPanel() {
             <svg
               role="img"
               aria-label="Pile elevation"
-              viewBox={`-20 -20 ${p.length + 40} ${Math.max(design.height, 30) + 40}`}
+              viewBox={`-20 -20 ${drainage.run + 40} ${Math.max(drainage.highCrest, drainage.rise, 30) + 40}`}
             >
               <polygon
-                points={`0,${design.height} ${p.length},${design.height} ${p.length - p.slope * design.height},0 ${p.slope * design.height},0`}
+                points={drainage.outline
+                  .map(
+                    ([x, z]) =>
+                      `${x},${Math.max(drainage.highCrest, drainage.rise) - z}`,
+                  )
+                  .join(" ")}
                 fill="#b0ad70"
                 stroke="#e1ddb0"
               />
@@ -75,19 +82,20 @@ export function DesignPanel() {
                 "Top (L × W)",
                 `${number(design.topLength, 2)} × ${number(design.topWidth, 2)} m`,
               ],
-              ["Side slope", `${number(p.slope, 2)}H : 1V`],
-              [
-                "Face angle",
-                `${number((Math.atan(1 / p.slope) * 180) / Math.PI, 1)}°`,
-              ],
+              ["Setback / ore thickness", `${number(p.slope, 2)}H : 1V`],
+              ["Steepest outer face", `${number(drainage.faceAngles.low, 2)}°`],
               ["Ore angle of repose", `${number(p.reposeAngle, 1)}°`],
               [
                 "Drainage grade",
-                `${number(p.drainageGrade, 2)}% to ${p.drainageDirection}`,
+                `${number(drainage.angle, 2)}° / ${number(p.drainageGrade, 2)}% to ${p.drainageDirection}`,
               ],
               [
                 "Pad elevation drop",
                 `${number((p.drainageGrade * (p.drainageDirection === "east" || p.drainageDirection === "west" ? p.length : p.width)) / 100, 2)} m`,
+              ],
+              [
+                "Crest elevations (low / high)",
+                `${number(drainage.lowCrest, 2)} / ${number(drainage.highCrest, 2)} m`,
               ],
               ["Footprint", `${number(design.area / 10000, 3)} ha`],
               ["Envelope volume", `${number(design.volume)} m³`],

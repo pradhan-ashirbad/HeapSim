@@ -32,6 +32,8 @@ import {
 import { landComponents, totalLand } from "@/engine/analysis";
 import { number } from "@/utils/format";
 import { Button } from "@/components/ui/button";
+import { CadExport } from "./cad-export";
+import { DrainagePanel } from "./drainage-panel";
 export const LazyHeapScene = dynamic(
   () => import("@/components/three-d/heap-scene"),
   {
@@ -230,6 +232,10 @@ export function Workspace({
           <Maximize size={14} />
         </button>
       </div>
+      <div className="workspace-cad">
+        <CadExport viewport />
+      </div>
+      <DrainagePanel inputs={result.inputs} />
       <div className="scene-toolbar">
         <div>
           <button

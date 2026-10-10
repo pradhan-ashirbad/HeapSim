@@ -89,6 +89,12 @@ export const inputsSchema = z
     closureCost: optionalNumber,
   })
   .superRefine((p, ctx) => {
+    if ((Math.atan(p.drainageGrade / 100) * 180) / Math.PI >= p.reposeAngle)
+      ctx.addIssue({
+        code: "custom",
+        path: ["drainageGrade"],
+        message: "Drainage angle must be less than the ore angle of repose.",
+      });
     const count =
       Math.ceil(p.length / p.cellLength) *
       Math.ceil(p.width / p.cellWidth) *

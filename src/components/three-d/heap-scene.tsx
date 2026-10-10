@@ -26,6 +26,7 @@ import {
   envelopeVolume,
   groundElevation,
 } from "@/engine/geometry";
+import { drainageProfile } from "@/engine/drainage";
 import { disposalFootprint, disposalGeometry } from "@/engine/analysis";
 import {
   stateColors,
@@ -436,7 +437,16 @@ function SceneContents({
       topByCell.set(def.cellId, def.lift);
   const selected = comparison ? null : ui.selectedCell;
   const sectionY = Math.ceil(p.width / 2 / p.cellWidth) * p.cellWidth;
+  const drainage = drainageProfile(p);
   const gradeAngle = Math.atan(p.drainageGrade / 100);
+  const gradePoints = [0, drainage.run].map((distance) => {
+    const [x, z, y] = drainage.pointAt(distance);
+    return (
+      p.drainageDirection === "east" || p.drainageDirection === "west"
+        ? [x, z + 0.5, p.width + 18]
+        : [p.length + 18, z + 0.5, y]
+    ) as [number, number, number];
+  });
   const tiltX =
     p.drainageDirection === "south"
       ? gradeAngle
@@ -495,19 +505,68 @@ function SceneContents({
         position={[0, -0.6, 0]}
       />
       <group position={[-p.length / 2, 0, -p.width / 2]}>
-        <mesh position={[p.length / 2, -1.2, p.width / 2]}>
-          <boxGeometry args={[p.length + 12, 2, p.width + 12]} />
+        <mesh
+          position={[
+            p.length / 2,
+            groundElevation(p, p.length / 2, p.width / 2) - 1.2,
+            p.width / 2,
+          ]}
+          rotation={[tiltX, 0, tiltZ]}
+        >
+          <boxGeometry
+            args={[
+              (p.length + 12) / Math.cos(tiltZ),
+              2,
+              (p.width + 12) / Math.cos(tiltX),
+            ]}
+          />
           <meshStandardMaterial color="#56614e" />
         </mesh>
         <Line points={drainLine} color="#77cfdd" lineWidth={3} />
+        {!comparison && ui.rulers && (
+          <>
+            <Line points={gradePoints} color="#77cfdd" lineWidth={2} />
+            <Line
+              points={[
+                gradePoints[0],
+                [gradePoints[1][0], 0.5, gradePoints[1][2]],
+              ]}
+              color="#839278"
+              dashed
+              dashSize={4}
+              gapSize={3}
+            />
+            <Line
+              points={[
+                [gradePoints[1][0], 0.5, gradePoints[1][2]],
+                gradePoints[1],
+              ]}
+              color="#f1c873"
+              lineWidth={2}
+            />
+            {gradePoints.map((point, i) => (
+              <Html
+                key={i}
+                position={[point[0], point[1] + 8, point[2]]}
+                center
+                style={{ pointerEvents: "none" }}
+              >
+                <span className="scene-small-label">
+                  {i ? "HIGH GROUND" : "LOW GROUND"}{" "}
+                  {number(i ? drainage.rise : 0, 2)} m
+                </span>
+              </Html>
+            ))}
+          </>
+        )}
         {!comparison && (
           <Html
             position={[drainLine[1][0], drainLine[1][1] + 2, drainLine[1][2]]}
             center
           >
             <span className="scene-small-label">
-              COLLECTION EDGE · {p.drainageGrade}%{" "}
-              {p.drainageDirection.toUpperCase()}
+              COLLECTION EDGE · {number(drainage.angle, 2)}° /{" "}
+              {number(p.drainageGrade, 2)}% {p.drainageDirection.toUpperCase()}
             </span>
           </Html>
         )}
@@ -534,7 +593,12 @@ function SceneContents({
                     ui.select(cell.id);
                   }}
                 >
-                  <planeGeometry args={[cell.length, cell.width]} />
+                  <planeGeometry
+                    args={[
+                      cell.length / Math.cos(tiltZ),
+                      cell.width / Math.cos(tiltX),
+                    ]}
+                  />
                   <meshStandardMaterial
                     color={
                       p.blockedCells.includes(cell.id)

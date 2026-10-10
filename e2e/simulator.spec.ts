@@ -52,8 +52,8 @@ test("live no-lift sizing reshapes geometry and exports real CAD", async ({
       .subarray(0, 6)
       .toString(),
   ).toBe("AC1015");
-  await page.getByLabel("CAD format").selectOption("dxf");
-  await page.getByLabel("CAD geometry").selectOption("day");
+  await page.getByLabel("CAD format", { exact: true }).selectOption("dxf");
+  await page.getByLabel("CAD geometry", { exact: true }).selectOption("day");
   const dxfEvent = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download CAD" }).click();
   const dxf = await dxfEvent;
@@ -344,6 +344,74 @@ test("WebGL fallback remains interactive on a narrow screen", async ({
     .toBe(true);
   await page.screenshot({
     path: "test-results/heapsim-mobile.png",
+    fullPage: true,
+  });
+});
+
+test("viewer exports graded DWG and displays editable two-degree elevations", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Drainage tilt (degrees)", { exact: true }).fill("2");
+  const profile = page.getByTestId("drainage-profile");
+  await expect
+    .poll(async () => Number(await profile.getAttribute("data-rise")))
+    .toBeCloseTo(300 * Math.tan((2 * Math.PI) / 180), 6);
+  await expect(page.locator(".drainage-controls")).toContainText(
+    "3.492% grade",
+  );
+  await page.getByLabel("Repose limit (degrees)", { exact: true }).fill("20");
+  await page.getByLabel("Overall side slope", { exact: true }).fill("1");
+  await expect(page.locator(".drainage-profile")).toContainText("20°");
+  await page
+    .getByLabel("Drainage direction", { exact: true })
+    .selectOption("east");
+  await expect
+    .poll(async () => Number(await profile.getAttribute("data-rise")))
+    .toBeCloseTo(400 * Math.tan((2 * Math.PI) / 180), 6);
+  await page.getByLabel("Simulation day", { exact: true }).fill("120");
+  const event = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download view DWG", exact: true })
+    .click();
+  const dwg = await event;
+  expect(dwg.suggestedFilename()).toBe("heapsim-day-120.dwg");
+  await dwg.saveAs("test-results/heapsim-graded-day.dwg");
+  expect(
+    (await readFile("test-results/heapsim-graded-day.dwg"))
+      .subarray(0, 6)
+      .toString(),
+  ).toBe("AC1015");
+  await page.getByLabel("View CAD geometry").selectOption("design");
+  await page.getByLabel("View CAD format").selectOption("dxf");
+  const dxfEvent = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download view DXF", exact: true })
+    .click();
+  const dxf = await dxfEvent;
+  await dxf.saveAs("test-results/heapsim-graded-design.dxf");
+  const text = await readFile("test-results/heapsim-graded-design.dxf", "utf8");
+  expect(text).toContain("DESIGN_SECTION");
+  expect(text).toContain("2.000 deg");
+  expect(text).toContain("HIGH WEST - GROUND Z=13.968m");
+  await page.reload();
+  await expect(
+    page.getByLabel("Drainage tilt (degrees)", { exact: true }),
+  ).toHaveValue("2");
+  await expect(
+    page.getByLabel("Drainage direction", { exact: true }),
+  ).toHaveValue("east");
+  await page.getByLabel("Drainage tilt (degrees)", { exact: true }).fill("90");
+  await expect(
+    page.getByLabel("Drainage tilt (degrees)", { exact: true }),
+  ).toHaveAttribute("aria-invalid", "true");
+  await expect
+    .poll(async () => Number(await profile.getAttribute("data-rise")))
+    .toBeCloseTo(400 * Math.tan((2 * Math.PI) / 180), 6);
+  await page.getByLabel("Drainage tilt (degrees)", { exact: true }).fill("2");
+  await page.locator(".drainage-panel").scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: "test-results/heapsim-drainage.png",
     fullPage: true,
   });
 });

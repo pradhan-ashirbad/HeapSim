@@ -19,7 +19,9 @@ describe.skipIf(process.platform !== "linux" || process.arch !== "x64")(
         stackingMode: "continuous" as const,
         oreTonnes: 1000000,
         maxHeight: 20,
-        slope: 2,
+        slope: 1,
+        reposeAngle: 20,
+        drainageGrade: Math.tan((2 * Math.PI) / 180) * 100,
       };
       const response = await POST(
         new Request("http://localhost/api/cad", {
@@ -51,6 +53,24 @@ describe.skipIf(process.platform !== "linux" || process.arch !== "x64")(
             .filter((e) => e.type === "TEXT")
             .some((e) => e.layer === "CELL_LABELS"),
         ).toBe(true);
+        for (const layer of [
+          "DRAINAGE_GRADE",
+          "DRAINAGE_DIMENSIONS",
+          "DESIGN_SECTION",
+        ])
+          expect(
+            db.entities.some((e) => e.type === "LINE" && e.layer === layer),
+          ).toBe(true);
+        const notes = db.entities.filter(
+          (e) => e.type === "TEXT" && e.layer === "DRAINAGE_NOTES",
+        );
+        expect(notes.length).toBe(
+          designDrawing(inputs).labels.filter(
+            (l) => l.layer === "DRAINAGE_NOTES",
+          ).length,
+        );
+        expect(JSON.stringify(notes)).toContain("2.000 deg");
+        expect(JSON.stringify(notes)).toContain("Repose limit 20.000 deg");
         const model = db.tables.BLOCK_RECORD.entries.filter(
           (b) => b.name === "*Model_Space",
         );

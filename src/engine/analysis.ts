@@ -136,7 +136,7 @@ export function engineeringWarnings(
     add(
       "repose",
       "Angle of repose limits side slope",
-      `The ${p.reposeAngle}° angle gives a minimum ${p.slope.toFixed(2)}H:1V outer face. This is a static geometric limit; temporary working faces still require operational design.`,
+      `The ${p.reposeAngle}° repose limit, corrected for ${p.drainageGrade}% pad grade, gives a minimum ${p.slope.toFixed(2)}H per 1V ore thickness setback. This is a static geometric limit; temporary working faces still require operational design.`,
       "info",
     );
   if (p.drainageGrade === 0)

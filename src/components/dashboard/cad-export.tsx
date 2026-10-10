@@ -4,10 +4,10 @@ import { Download } from "lucide-react";
 import { useProject } from "@/store/use-project";
 import { Button } from "@/components/ui/button";
 
-export function CadExport() {
+export function CadExport({ viewport = false }: { viewport?: boolean }) {
   const inputs = useProject((s) => s.inputs),
     day = useProject((s) => s.day);
-  const [scope, setScope] = useState("design"),
+  const [scope, setScope] = useState(viewport ? "day" : "design"),
     [format, setFormat] = useState("dwg"),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -39,7 +39,7 @@ export function CadExport() {
     <div className="cad-export">
       <div>
         <select
-          aria-label="CAD geometry"
+          aria-label={viewport ? "View CAD geometry" : "CAD geometry"}
           value={scope}
           onChange={(e) => setScope(e.target.value)}
         >
@@ -47,7 +47,7 @@ export function CadExport() {
           <option value="day">Current operating day</option>
         </select>
         <select
-          aria-label="CAD format"
+          aria-label={viewport ? "View CAD format" : "CAD format"}
           value={format}
           onChange={(e) => setFormat(e.target.value)}
         >
@@ -56,10 +56,14 @@ export function CadExport() {
         </select>
         <Button onClick={save} disabled={busy}>
           <Download size={14} />
-          {busy ? "Exporting…" : "Download CAD"}
+          {busy
+            ? "Exporting…"
+            : viewport
+              ? `Download view ${format.toUpperCase()}`
+              : "Download CAD"}
         </Button>
       </div>
-      <small>3D faces · metres · X east / Y north / Z up</small>
+      <small>All cells & lifts · 3D faces + drainage profile · metres</small>
       {error && <p role="alert">{error}</p>}
     </div>
   );

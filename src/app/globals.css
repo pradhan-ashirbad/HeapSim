@@ -2302,3 +2302,105 @@ svg {
     height: 220px;
   }
 }
+
+.workspace-cad {
+  padding: 12px 18px;
+  border-bottom: 1px solid #344831;
+}
+.drainage-panel {
+  padding: 12px 18px;
+  border-bottom: 1px solid #344831;
+  background: #1b281f;
+}
+.drainage-panel summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #dce4ce;
+}
+.drainage-panel summary span {
+  color: #a1b496;
+  margin-left: 10px;
+  font-size: 10px;
+}
+.drainage-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 11px;
+}
+.drainage-input {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  max-width: 210px;
+}
+.drainage-input input,
+.drainage-input select {
+  width: 150px;
+  max-width: 100%;
+  color: #dce4ce;
+  background: #17231f;
+  border: 1px solid #536b44;
+  border-radius: 4px;
+  padding: 6px;
+}
+.drainage-input small {
+  color: #f4b391;
+}
+.drainage-profile {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(230px, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+.drainage-profile svg {
+  width: 100%;
+}
+.drainage-profile text {
+  fill: #dce4ce;
+  font-size: 12px;
+}
+.drainage-profile dl {
+  font-size: 11px;
+}
+.drainage-profile dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #344831;
+}
+.drainage-profile dd {
+  margin: 0;
+  color: #e1ddb0;
+  white-space: nowrap;
+}
+.drainage-panel p {
+  font-size: 10px;
+  line-height: 1.6;
+  color: #a1b496;
+  margin: 4px 0 0;
+}
+@media (max-width: 800px) {
+  .drainage-profile {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .drainage-panel summary span {
+    display: block;
+    margin: 6px 0 0;
+  }
+}
+
+.expanded-viewport {
+  overflow-y: auto;
+}
+.expanded-viewport > :not(.scene-stage) {
+  flex-shrink: 0;
+}
+.expanded-viewport .scene-stage {
+  min-height: 280px;
+}

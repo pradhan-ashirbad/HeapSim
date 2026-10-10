@@ -10,8 +10,23 @@ export const nominalCellCapacity = (
   density: number,
 ) => length * width * height * density;
 export const setback = (height: number, slope: number) => height * slope;
-export const reposeSlope = (p: ProjectInputs) =>
-  p.reposeAngle === 90 ? 0 : 1 / Math.tan((p.reposeAngle * Math.PI) / 180);
+export const gradeToDegrees = (grade: number) =>
+  (Math.atan(grade / 100) * 180) / Math.PI;
+export const degreesToGrade = (angle: number) =>
+  Math.tan((angle * Math.PI) / 180) * 100;
+export function reposeSlope(p: ProjectInputs) {
+  if (p.reposeAngle === 90) return 0;
+  // Adding the pad plane steepens the downhill face by the pad gradient.
+  // One conservative setback is used for all four sides, measured per metre
+  // of vertical ore thickness. The steepest true face stays at/below repose.
+  const availableGradient =
+    Math.tan((p.reposeAngle * Math.PI) / 180) - p.drainageGrade / 100;
+  if (availableGradient <= 0)
+    throw new Error(
+      "Drainage angle must be less than the ore angle of repose.",
+    );
+  return 1 / availableGradient;
+}
 export const effectiveSlope = (p: ProjectInputs) =>
   Math.max(p.slope, reposeSlope(p));
 export function groundElevation(p: ProjectInputs, x: number, y: number) {

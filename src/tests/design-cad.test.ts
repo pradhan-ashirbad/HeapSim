@@ -120,7 +120,7 @@ describe("CAD geometry", () => {
     };
     const d = designDrawing(p);
     expect(effectiveSlope(p)).toBeCloseTo(
-      1 / Math.tan((20 * Math.PI) / 180),
+      1 / (Math.tan((20 * Math.PI) / 180) - 0.03),
       10,
     );
     expect(d.inputs.slope).toBeCloseTo(effectiveSlope(p), 10);

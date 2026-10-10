@@ -7,6 +7,7 @@ import type {
   SimulationSnapshot,
 } from "@/types/model";
 import { heapDesign } from "./design";
+import { drainageProfile } from "./drainage";
 import {
   boundsAt,
   filledHeight,
@@ -110,6 +111,100 @@ function facesFromMesh(
   }
   return faces;
 }
+/** Dimensioned ground plane and a separate true-scale planned elevation section. */
+function drainageDrawing(p: ProjectInputs) {
+  const d = drainageProfile(p),
+    lines: CadLine[] = [],
+    labels: CadLabel[] = [];
+  const h = Math.max(1, Math.min(p.length, p.width) / 100);
+  const addLine = (layer: string, start: CadPoint, end: CadPoint) =>
+    lines.push({ layer, start, end });
+  const addLabel = (layer: string, point: CadPoint, value: string) =>
+    labels.push({ layer, point, value, height: h });
+  const at = (distance: number, thickness = 0): CadPoint => {
+    const [x, z, y] = d.pointAt(distance, thickness);
+    return d.lowDirection === "east" || d.lowDirection === "west"
+      ? [x, h * 4, z]
+      : [p.length + h * 4, -y, z];
+  };
+  const low = at(0),
+    high = at(d.run),
+    highDatum: CadPoint = [high[0], high[1], 0];
+  addLine("DRAINAGE_GRADE", low, high);
+  addLine("DRAINAGE_DATUM", low, highDatum);
+  addLine("DRAINAGE_DIMENSIONS", highDatum, high);
+  // Arrow points downhill on the graded plane, outside the ore cells.
+  const tip = at(d.run * 0.3),
+    tail = at(d.run * 0.7),
+    wing = at(d.run * 0.36);
+  addLine("DRAINAGE_GRADE", tail, tip);
+  for (const sign of [-1, 1]) {
+    const side: CadPoint = [...wing];
+    side[d.lowDirection === "east" || d.lowDirection === "west" ? 1 : 0] +=
+      sign * h * 2;
+    addLine("DRAINAGE_GRADE", tip, side);
+  }
+  addLabel(
+    "DRAINAGE_NOTES",
+    low,
+    `LOW ${d.lowDirection.toUpperCase()} - GROUND Z=0.000m (datum)`,
+  );
+  addLabel(
+    "DRAINAGE_NOTES",
+    high,
+    `HIGH ${d.highDirection.toUpperCase()} - GROUND Z=${d.rise.toFixed(3)}m`,
+  );
+  addLabel(
+    "DRAINAGE_NOTES",
+    at(d.run / 2),
+    `DRAIN TO ${d.lowDirection.toUpperCase()}: ${d.angle.toFixed(3)} deg / ${p.drainageGrade.toFixed(3)}%; RISE ${d.rise.toFixed(3)}m`,
+  );
+  // XY layout of a vertical section, offset away from the heap plan; all metres, 1:1.
+  const originX = p.length + h * 20,
+    originY = h * 30;
+  const section = ([distance, elevation]: number[]): CadPoint => [
+    originX + distance,
+    originY + elevation,
+    0,
+  ];
+  for (let i = 0; i < d.outline.length; i++)
+    addLine(
+      "DESIGN_SECTION",
+      section(d.outline[i]),
+      section(d.outline[(i + 1) % d.outline.length]),
+    );
+  addLine("DRAINAGE_DIMENSIONS", section([0, 0]), section([d.run, 0]));
+  addLine("DRAINAGE_DIMENSIONS", section([d.run, 0]), section([d.run, d.rise]));
+  for (const distance of [d.inset, d.run - d.inset])
+    addLine(
+      "DRAINAGE_DIMENSIONS",
+      section([distance, (distance * p.drainageGrade) / 100]),
+      section([distance, (distance * p.drainageGrade) / 100 + d.height]),
+    );
+  const notes = [
+    "PLANNED FULL HEAP - DRAINAGE SECTION - TRUE SCALE 1:1 - METRES",
+    `Left: LOW ${d.lowDirection.toUpperCase()} / Right: HIGH ${d.highDirection.toUpperCase()}; datum = low ground 0.000m`,
+    `Run ${d.run.toFixed(3)}m; tilt ${d.angle.toFixed(3)} deg = ${p.drainageGrade.toFixed(3)}%; rise = run x tan(tilt) = ${d.rise.toFixed(3)}m`,
+    `Ground low / high: 0.000 / ${d.rise.toFixed(3)}m; crest low / high: ${d.lowCrest.toFixed(3)} / ${d.highCrest.toFixed(3)}m`,
+    `Vertical ore thickness ${d.height.toFixed(3)}m; crest setback ${d.inset.toFixed(3)}m each side`,
+    `Repose limit ${p.reposeAngle.toFixed(3)} deg; actual outer face low / high / cross: ${d.faceAngles.low.toFixed(3)} / ${d.faceAngles.high.toFixed(3)} / ${d.faceAngles.cross.toFixed(3)} deg`,
+    `Setback ${p.slope.toFixed(3)}H per 1V ore thickness (includes drainage correction); temporary internal fronts schematic`,
+  ];
+  notes.forEach((note, i) =>
+    addLabel("DRAINAGE_NOTES", section([0, -h * (4 + i * 2)]), note),
+  );
+  addLabel(
+    "DRAINAGE_NOTES",
+    section([d.inset, d.lowCrest + h * 2]),
+    `LOW CREST Z=${d.lowCrest.toFixed(3)}m`,
+  );
+  addLabel(
+    "DRAINAGE_NOTES",
+    section([d.run - d.inset, d.highCrest + h * 4]),
+    `HIGH CREST Z=${d.highCrest.toFixed(3)}m`,
+  );
+  return { lines, labels };
+}
 export function designDrawing(inputs: ProjectInputs): CadDrawing {
   const d = heapDesign(inputs);
   const cells = generateCells(d.inputs),
@@ -123,14 +218,17 @@ export function designDrawing(inputs: ProjectInputs): CadDrawing {
     ),
   );
   const grid = gridDrawing(d.inputs, cells);
+  const drainage = drainageDrawing(d.inputs);
   const lines = [
     ...grid.lines,
+    ...drainage.lines,
     ...segments.flatMap((s) =>
       outline(d.inputs, byCell.get(s.cellId)!, s.z1, `CELL_TOP_L${s.lift}`),
     ),
   ];
   const labels = [
     ...grid.labels,
+    ...drainage.labels,
     ...segments
       .filter((s) => s.topArea > 1)
       .map((s): CadLabel => {
@@ -172,8 +270,9 @@ export function snapshotDrawing(
   const p = result.inputs,
     cells = new Map(result.cells.map((c) => [c.id, c]));
   const grid = gridDrawing(p, result.cells);
-  const lines = [...grid.lines];
-  const labels = [...grid.labels];
+  const drainage = drainageDrawing(p);
+  const lines = [...grid.lines, ...drainage.lines];
+  const labels = [...grid.labels, ...drainage.labels];
   const faces = result.segments.flatMap((s) => {
     const cell = cells.get(s.cellId)!;
     const mass = snapshot.segments[s.index].tonnes;
@@ -258,7 +357,7 @@ export function drawingDxf(d: CadDrawing) {
     ...new Set(d.labels.map((l) => l.layer)),
     ...new Set(d.faces.map((f) => f.layer)),
   ];
-  for (const layer of layers)
+  for (const layer of new Set(layers))
     writer.addLayer(layer, layer === "MEASUREMENTS" ? 2 : 3);
   for (const face of d.faces) {
     const [a, b, c] = face.vertices.map((p) => point3d(...p));
