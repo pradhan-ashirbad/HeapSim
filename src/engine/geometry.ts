@@ -11,7 +11,9 @@ export const nominalCellCapacity = (
 ) => length * width * height * density;
 export const setback = (height: number, slope: number) => height * slope;
 export const designHeight = (p: ProjectInputs) =>
-  Math.min(p.maxHeight, p.maxLifts * p.liftHeight);
+  p.scenario === "permanent" && p.stackingMode === "continuous"
+    ? p.maxHeight
+    : Math.min(p.maxHeight, p.maxLifts * p.liftHeight);
 export function envelopeVolume(
   length: number,
   width: number,
@@ -56,7 +58,40 @@ export function requiredFootprint(
     area: high * high * aspectRatio,
   };
 }
+// The maximum height is a cap. Small piles reach their natural apex below it;
+// forcing the cap would reserve a footprint larger than the supplied ore volume.
+export function continuousPile(p: ProjectInputs) {
+  const volume = oreVolume(p.oreTonnes, p.density);
+  const unitWidth = 2 * p.slope * Math.max(1, 1 / p.aspectRatio);
+  const apexCoefficient = envelopeVolume(
+    unitWidth * p.aspectRatio,
+    unitWidth,
+    1,
+    p.slope,
+  );
+  const height =
+    p.slope > 0
+      ? Math.min(p.maxHeight, Math.cbrt(volume / apexCoefficient))
+      : p.maxHeight;
+  return {
+    ...requiredFootprint(volume, height, p.slope, p.aspectRatio),
+    height,
+    volume,
+  };
+}
 export function resolveInputs(p: ProjectInputs): ProjectInputs {
+  if (p.scenario === "permanent" && p.stackingMode === "continuous") {
+    const pile = continuousPile(p);
+    return {
+      ...p,
+      length: pile.length,
+      width: pile.width,
+      maxHeight: pile.height,
+      liftHeight: pile.height,
+      maxLifts: 1,
+      sizingMode: "fixed-ore",
+    };
+  }
   if (p.sizingMode !== "fixed-ore") return { ...p };
   const height =
     p.scenario === "permanent"

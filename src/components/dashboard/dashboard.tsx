@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Header } from "./header";
+import { DesignPanel } from "./design-panel";
 import { Parameters } from "@/components/inputs/parameters";
 import { Workspace, Warnings } from "./workspace";
 import { CellDetails } from "@/components/cell-details/cell-details";
@@ -50,6 +51,7 @@ export function Dashboard() {
               <CircleDot size={12} /> PLANNING MODEL
             </span>
           </div>
+          <DesignPanel />
           {error ? (
             <div className="error-panel" role="alert">
               <h2>Model could not be calculated</h2>
@@ -133,17 +135,19 @@ export function Dashboard() {
                   </strong>
                   <div>
                     <span>
-                      {Math.ceil(snapshot.metrics.height / inputs.liftHeight)}{" "}
-                      constructed lifts
+                      {inputs.scenario === "permanent" &&
+                      inputs.stackingMode === "continuous"
+                        ? "Continuous pile · no lift divisions"
+                        : `${Math.ceil(snapshot.metrics.height / result.inputs.liftHeight)} constructed lifts`}
                     </span>
                     <span>{inputs.maxHeight} m limit</span>
                   </div>
                   <div className="lift-bars">
-                    {Array.from({ length: inputs.maxLifts }, (_, i) => (
+                    {Array.from({ length: result.inputs.maxLifts }, (_, i) => (
                       <i
                         key={i}
                         className={
-                          snapshot.metrics.height > i * inputs.liftHeight
+                          snapshot.metrics.height > i * result.inputs.liftHeight
                             ? "filled"
                             : ""
                         }

@@ -49,7 +49,7 @@ export const useProject = create<ProjectStore>()(
       setInputs: (inputs) => {
         const parsed = inputsSchema.parse(inputs);
         if (JSON.stringify(parsed) !== JSON.stringify(get().inputs))
-          set({ inputs: parsed, playing: false });
+          set({ inputs: parsed, playing: false, selectedLift: null });
       },
       set,
       select: (selectedCell, selectedLift = null) =>

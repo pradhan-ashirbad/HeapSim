@@ -7,6 +7,8 @@ import { useProject } from "@/store/use-project";
 import { useSimulation } from "@/store/use-simulation";
 import {
   scenarioNames,
+  comparisonScenarios,
+  scenarioNumbers,
   type Scenario,
   type SimulationResults,
   type ProjectInputs,
@@ -21,7 +23,7 @@ import {
 import { compact, download, number } from "@/utils/format";
 import { Button } from "@/components/ui/button";
 import { CostComparison } from "@/components/charts/cost-comparison";
-const scenarios: Scenario[] = ["permanent", "dry", "new-tsf", "existing-tsf"];
+const scenarios = comparisonScenarios;
 function useScenario(inputs: ProjectInputs, scenario: Scenario) {
   return useSimulation(
     useMemo(() => ({ ...inputs, scenario }), [inputs, scenario]),
@@ -42,9 +44,7 @@ function ComparisonCard({
     return (
       <section className="comparison-card">
         <header>
-          <span className="eyebrow">
-            SCENARIO {scenarios.indexOf(scenario) + 1}
-          </span>
+          <span className="eyebrow">SCENARIO {scenarioNumbers[scenario]}</span>
           <h2>{scenarioNames[scenario]}</h2>
         </header>
         <div className="card-status">
@@ -56,6 +56,17 @@ function ComparisonCard({
     final = result.frames.at(-1)!.metrics,
     costs = indicativeCosts(p);
   const rows: [string, string][] = [
+    [
+      "Design height",
+      `${number(p.scenario === "permanent" ? Math.min(p.maxHeight, p.maxLifts * p.liftHeight) : Math.min(p.maxHeight, p.liftHeight), 2)} m`,
+    ],
+    ["Pile base (L × W)", `${number(p.length, 1)} × ${number(p.width, 1)} m`],
+    [
+      "Construction",
+      p.scenario === "permanent" && p.stackingMode === "continuous"
+        ? "Single continuous pile"
+        : "Lift stacking",
+    ],
     ["Pad footprint", `${number((p.length * p.width) / 10000, 2)} ha`],
     ["Total new land", `${number(totalLand(p) / 10000, 2)} ha`],
     [
@@ -118,9 +129,7 @@ function ComparisonCard({
   return (
     <section className="comparison-card">
       <header>
-        <span className="eyebrow">
-          SCENARIO 0{scenarios.indexOf(scenario) + 1}
-        </span>
+        <span className="eyebrow">SCENARIO 0{scenarioNumbers[scenario]}</span>
         <h2>{scenarioNames[scenario]}</h2>
       </header>
       <dl className="data-rows">
@@ -148,24 +157,19 @@ function ComparisonCard({
 }
 export function Comparison() {
   const inputs = useProject((s) => s.inputs),
-    [day, setDay] = useState(220),
-    [right, setRight] = useState<Scenario>("dry");
+    [day, setDay] = useState(220);
   const permanent = useScenario(inputs, "permanent"),
-    dry = useScenario(inputs, "dry"),
-    newTsf = useScenario(inputs, "new-tsf"),
-    existing = useScenario(inputs, "existing-tsf");
+    newTsf = useScenario(inputs, "new-tsf");
   const models = {
     permanent,
-    dry,
     "new-tsf": newTsf,
-    "existing-tsf": existing,
   };
   const maxDay = Math.max(
     0,
     ...Object.values(models).map((m) => (m.result?.frames.length ?? 1) - 1),
   );
   const leftResult = permanent.result,
-    rightResult = models[right].result;
+    rightResult = newTsf.result;
   const leftSnapshot = useMemo(
     () => (leftResult ? snapshotAt(leftResult, day) : null),
     [leftResult, day],
@@ -181,7 +185,7 @@ export function Comparison() {
         <div className="document-heading">
           <div>
             <span className="eyebrow">ENGINEERING / ALTERNATIVES ANALYSIS</span>
-            <h1>One orebody. Four operating plans.</h1>
+            <h1>One orebody. Two operating plans.</h1>
             <p>
               Common feed, calendars, physical assumptions and engineering
               clearances. Independent, deterministic schedules.
@@ -202,6 +206,28 @@ export function Comparison() {
           >
             <Download size={14} /> Export comparison
           </Button>
+        </div>
+        <div className="comparison-mode">
+          <label htmlFor="comparison-stacking">Scenario 1 construction</label>
+          <select
+            id="comparison-stacking"
+            value={inputs.stackingMode}
+            onChange={(e) =>
+              useProject.getState().setInputs({
+                ...inputs,
+                stackingMode: e.target.value as ProjectInputs["stackingMode"],
+              })
+            }
+          >
+            <option value="lifts">Stack in lifts</option>
+            <option value="continuous">
+              Single pile · automatically size footprint
+            </option>
+          </select>
+          <span>
+            No-lift sizing uses ore, density, slope, aspect ratio and maximum
+            height.
+          </span>
         </div>
         <div className="comparison-grid">
           {scenarios.map((s) => (
@@ -231,7 +257,11 @@ export function Comparison() {
         <div className="compare-scenes">
           <section className="comparison-scene">
             <header>
-              Permanent multi-lift heap <span>Day {Math.min(day, maxDay)}</span>
+              Permanent{" "}
+              {inputs.stackingMode === "continuous"
+                ? "single pile"
+                : "multi-lift heap"}{" "}
+              <span>Day {Math.min(day, maxDay)}</span>
             </header>
             {leftResult && leftSnapshot ? (
               <SceneOrFallback
@@ -245,17 +275,7 @@ export function Comparison() {
           </section>
           <section className="comparison-scene">
             <header>
-              <select
-                aria-label="Right comparison scenario"
-                value={right}
-                onChange={(e) => setRight(e.target.value as Scenario)}
-              >
-                {scenarios.slice(1).map((s) => (
-                  <option key={s} value={s}>
-                    {scenarioNames[s]}
-                  </option>
-                ))}
-              </select>
+              {scenarioNames["new-tsf"]}
               <span>Day {Math.min(day, maxDay)}</span>
             </header>
             {rightResult && rightSnapshot ? (
@@ -272,9 +292,9 @@ export function Comparison() {
         <p className="comparison-note">
           Each scene holds its final recorded state after its schedule ends. A
           stalled schedule is not treated as complete. On-off scenarios use one
-          reusable lift; permanent scenarios retain their lower lifts. Existing
-          TSF land is excluded from new land, but storage capacity and all
-          entered handling costs still apply.
+          reusable lift. Scenario 1 supports retained lifts or a continuous pile
+          with an automatically calculated footprint. Only scenarios 1 and 3 are
+          compared.
         </p>
       </main>
     </>

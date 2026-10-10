@@ -5,3 +5,5 @@ test-results
 playwright-report
 coverage
 next-env.d.ts
+vendor
+public/third-party

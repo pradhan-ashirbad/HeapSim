@@ -238,6 +238,7 @@ export function simulate(raw: ProjectInputs): SimulationResults {
       )
         continue;
       if (
+        !(p.scenario === "permanent" && p.stackingMode === "continuous") &&
         p.approvedLiftHeight !== null &&
         def.z1 - def.z0 > p.approvedLiftHeight + EPS
       )

@@ -7,6 +7,7 @@ export const inputsSchema = z
   .object({
     projectName: z.string().min(1).max(100),
     scenario: z.enum(["permanent", "dry", "new-tsf", "existing-tsf"]),
+    stackingMode: z.enum(["lifts", "continuous"]).default("lifts"),
     oreTonnes: positive.max(100_000_000),
     density: positive.max(5),
     oreType: z.string().min(1).max(80),
@@ -24,7 +25,7 @@ export const inputsSchema = z
     width: positive.max(5000),
     cellLength: positive,
     cellWidth: positive,
-    liftHeight: positive.max(100),
+    liftHeight: positive.max(200),
     maxHeight: positive.max(200),
     maxLifts: z.number().int().min(1).max(20),
     slope: nonnegative.max(10),
@@ -86,7 +87,9 @@ export const inputsSchema = z
     const count =
       Math.ceil(p.length / p.cellLength) *
       Math.ceil(p.width / p.cellWidth) *
-      p.maxLifts;
+      (p.scenario === "permanent" && p.stackingMode === "continuous"
+        ? 1
+        : p.maxLifts);
     if (count > 5000)
       ctx.addIssue({
         code: "custom",
@@ -111,8 +114,15 @@ export const inputsSchema = z
   });
 export type ProjectInputs = z.infer<typeof inputsSchema>;
 export type Scenario = ProjectInputs["scenario"];
+export const comparisonScenarios = ["permanent", "new-tsf"] as const;
+export const scenarioNumbers: Record<Scenario, number> = {
+  permanent: 1,
+  dry: 2,
+  "new-tsf": 3,
+  "existing-tsf": 4,
+};
 export const scenarioNames: Record<Scenario, string> = {
-  permanent: "Permanent multi-lift",
+  permanent: "Permanent heap",
   dry: "On-off + dry storage",
   "new-tsf": "On-off + new disposal",
   "existing-tsf": "On-off + existing TSF",
@@ -246,6 +256,7 @@ export interface SimulationSnapshot {
 export const defaults: ProjectInputs = {
   projectName: "Aurora · 3 Mt development plan",
   scenario: "permanent",
+  stackingMode: "lifts",
   oreTonnes: 3_000_000,
   density: 1.6,
   oreType: "Primary oxide ore",

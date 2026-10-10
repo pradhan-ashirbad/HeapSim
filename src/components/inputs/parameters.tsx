@@ -4,6 +4,7 @@ import { ChevronDown, SlidersHorizontal, RotateCcw, Info } from "lucide-react";
 import { defaults, inputsSchema, type ProjectInputs } from "@/types/model";
 import { useProject } from "@/store/use-project";
 import { Button } from "@/components/ui/button";
+import { resolveInputs } from "@/engine/geometry";
 type Field = {
   key: keyof ProjectInputs;
   label: string;
@@ -30,6 +31,14 @@ const groups: Group[] = [
     title: "Heap geometry",
     number: "02",
     fields: [
+      {
+        key: "stackingMode",
+        label: "Permanent heap construction",
+        options: [
+          ["lifts", "Stack in lifts"],
+          ["continuous", "Single pile · no lifts"],
+        ],
+      },
       {
         key: "sizingMode",
         label: "Design basis",
@@ -217,7 +226,10 @@ function ParameterField({ field }: { field: Field }) {
     setError("");
   }, [value]);
   const commit = (next: unknown) => {
-    const parsed = inputsSchema.safeParse({ ...inputs, [field.key]: next });
+    const parsed = inputsSchema.safeParse({
+      ...useProject.getState().inputs,
+      [field.key]: next,
+    });
     if (!parsed.success) {
       setError(parsed.error.issues.map((i) => i.message).join(" "));
       return;
@@ -226,6 +238,39 @@ function ParameterField({ field }: { field: Field }) {
     setInputs(parsed.data);
   };
   const id = `input-${field.key}`;
+  const continuous =
+    inputs.scenario === "permanent" && inputs.stackingMode === "continuous";
+  const calculated =
+    (inputs.sizingMode === "fixed-ore" || continuous) &&
+    (field.key === "length" || field.key === "width");
+  const resolved = calculated ? resolveInputs(inputs) : inputs;
+  // Update valid numeric edits after a short pause without requiring blur/Enter.
+  useEffect(() => {
+    if (
+      calculated ||
+      field.options ||
+      typeof value === "boolean" ||
+      draft === String(value ?? "")
+    )
+      return;
+    const timer = setTimeout(
+      () =>
+        commit(
+          typeof value === "string"
+            ? draft
+            : draft.trim() === ""
+              ? null
+              : Number(draft),
+        ),
+      350,
+    );
+    return () => clearTimeout(timer);
+  }, [draft, value, calculated]);
+  if (
+    (field.key === "stackingMode" && inputs.scenario !== "permanent") ||
+    (continuous && ["liftHeight", "maxLifts", "sizingMode"].includes(field.key))
+  )
+    return null;
   if (typeof value === "boolean")
     return (
       <label className="check-field" htmlFor={id}>
@@ -266,12 +311,13 @@ function ParameterField({ field }: { field: Field }) {
             id={id}
             type={isText ? "text" : "number"}
             step="any"
-            value={draft}
-            placeholder={value === null ? "Not supplied" : ""}
-            disabled={
-              inputs.sizingMode === "fixed-ore" &&
-              (field.key === "length" || field.key === "width")
+            value={
+              calculated
+                ? Number(Number(resolved[field.key]).toFixed(2))
+                : draft
             }
+            placeholder={value === null ? "Not supplied" : ""}
+            disabled={calculated}
             aria-invalid={!!error}
             aria-describedby={error ? `${id}-error` : undefined}
             onChange={(e) => setDraft(e.target.value)}

@@ -141,7 +141,7 @@ export function engineeringWarnings(
       "error",
     );
   }
-  if (p.slope * h * 2 >= Math.min(p.length, p.width))
+  if (p.slope * h * 2 > Math.min(p.length, p.width) + 1e-7)
     add(
       "slope",
       "Top footprint closes below planned height",
@@ -149,19 +149,31 @@ export function engineeringWarnings(
       "error",
     );
   if (
-    !p.geotech ||
-    !p.permeability ||
-    !p.foundation ||
-    p.approvedLiftHeight === null ||
-    p.approvedHeight === null
+    p.scenario === "permanent" &&
+    p.stackingMode !== "continuous" &&
+    p.maxLifts > 1 &&
+    (!p.geotech ||
+      !p.permeability ||
+      !p.foundation ||
+      p.approvedLiftHeight === null ||
+      p.approvedHeight === null)
   )
     add(
       "overstack",
       "Overstacking clearance required",
       "Upper lifts require geotechnical, foundation and permeability validation, plus approved lift and overall heights. Lower lift history is retained; upper stacking remains blocked.",
     );
+  if (p.scenario === "permanent" && p.stackingMode === "continuous")
+    add(
+      "continuous",
+      "Continuous pile sizing concept",
+      "The entire ore quantity is sized as one sloped pile without lift divisions. Cells are scheduling zones only. Footprint excludes infrastructure; geotechnical stability, full-depth leaching and construction method require validation.",
+      "info",
+    );
   if (
-    (p.approvedLiftHeight !== null && p.liftHeight > p.approvedLiftHeight) ||
+    (!(p.scenario === "permanent" && p.stackingMode === "continuous") &&
+      p.approvedLiftHeight !== null &&
+      p.liftHeight > p.approvedLiftHeight) ||
     (p.approvedHeight !== null && h > p.approvedHeight)
   )
     add(

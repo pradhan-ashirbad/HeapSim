@@ -1,4 +1,65 @@
 import { test, expect } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+
+test("live no-lift sizing reshapes geometry and exports real CAD", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page
+    .getByLabel("Permanent heap construction")
+    .selectOption("continuous");
+  const design = page.getByTestId("design-preview");
+  await expect(
+    page.getByRole("heading", { name: "Single pile · no lifts" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Pad length", { exact: true })).toBeDisabled();
+  await expect(page.getByLabel("Lift height", { exact: true })).toHaveCount(0);
+  const initialWidth = Number(await design.getAttribute("data-width"));
+  await page.getByLabel("Total ore", { exact: true }).fill("1000000");
+  // No blur or Enter: valid edits must update the geometry themselves.
+  await expect
+    .poll(async () => Number(await design.getAttribute("data-volume")))
+    .toBeCloseTo(625000, 2);
+  expect(Number(await design.getAttribute("data-width"))).toBeLessThan(
+    initialWidth,
+  );
+  await page.getByLabel("Overall side slope", { exact: true }).fill("2");
+  await expect(design).toHaveAttribute("data-slope", "2");
+  await page.getByLabel("Maximum height", { exact: true }).fill("20");
+  await expect(design).toHaveAttribute("data-height", "20");
+  await expect(page.locator(".design-preview canvas")).toBeVisible();
+  const event = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download CAD" }).click();
+  const dwg = await event;
+  expect(dwg.suggestedFilename()).toBe("heapsim-design.dwg");
+  await dwg.saveAs("test-results/heapsim-design.dwg");
+  expect(
+    (await readFile("test-results/heapsim-design.dwg"))
+      .subarray(0, 6)
+      .toString(),
+  ).toBe("AC1015");
+  await page.getByLabel("CAD format").selectOption("dxf");
+  await page.getByLabel("CAD geometry").selectOption("day");
+  const dxfEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download CAD" }).click();
+  const dxf = await dxfEvent;
+  expect(dxf.suggestedFilename()).toMatch(/^heapsim-day-\d+\.dxf$/);
+  await dxf.saveAs("test-results/heapsim-day.dxf");
+  expect(await readFile("test-results/heapsim-day.dxf", "utf8")).toContain(
+    "3DFACE",
+  );
+  await page.screenshot({
+    path: "test-results/heapsim-continuous.png",
+    fullPage: true,
+  });
+  await page.reload();
+  await expect(page.getByLabel("Permanent heap construction")).toHaveValue(
+    "continuous",
+  );
+  expect(errors).toEqual([]);
+});
 
 test("real 3D geometry, synchronized selection, playback and reverse scrubbing", async ({
   page,
@@ -7,7 +68,7 @@ test("real 3D geometry, synchronized selection, playback and reverse scrubbing",
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await expect(page.getByLabel("Simulation day")).toBeVisible();
-  await expect(page.locator("canvas")).toBeVisible();
+  await expect(page.locator(".visualization canvas")).toBeVisible();
   await page.getByRole("button", { name: "Split view", exact: true }).click();
   const cell = page.getByTestId("cell-B4");
   await cell.click();
@@ -22,7 +83,7 @@ test("real 3D geometry, synchronized selection, playback and reverse scrubbing",
   // Ray-pick a real ore mesh from the top camera, then verify the shared 2D selection.
   await page.getByRole("button", { name: "Top", exact: true }).click();
   await page.waitForTimeout(300);
-  const box = (await page.locator("canvas").boundingBox())!;
+  const box = (await page.locator(".visualization canvas").boundingBox())!;
   const zoom = Math.min(box.width / (400 * 1.55), box.height / (400 * 0.98));
   await page.mouse.click(
     box.x + box.width / 2 - 75 * zoom,
@@ -176,11 +237,31 @@ test("comparison and report are calculated from the shared assumptions", async (
   page,
 }) => {
   await page.goto("/scenarios");
-  await expect(page.locator(".comparison-card")).toHaveCount(4);
-  await expect(page.locator(".comparison-card .data-rows")).toHaveCount(4);
-  await expect(
-    page.getByText("TSF INTEGRATION NOT VALIDATED", { exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".comparison-card")).toHaveCount(2);
+  await expect(page.locator(".comparison-card .data-rows")).toHaveCount(2);
+  await expect(page.locator(".comparison-card").first()).toContainText(
+    "SCENARIO 01",
+  );
+  await expect(page.locator(".comparison-card").last()).toContainText(
+    "SCENARIO 03",
+  );
+  await page.getByLabel("Scenario 1 construction").selectOption("continuous");
+  await expect(page.locator(".comparison-card").first()).toContainText(
+    "Single continuous pile",
+  );
+  const comparisonDownload = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export comparison", exact: true })
+    .click();
+  await (await comparisonDownload).saveAs("test-results/comparison.json");
+  const exported = JSON.parse(
+    await readFile("test-results/comparison.json", "utf8"),
+  );
+  expect(Object.keys(exported).sort()).toEqual(["new-tsf", "permanent"]);
+  await page.getByLabel("Scenario 1 construction").selectOption("lifts");
+  await expect(page.locator(".comparison-card").first()).toContainText(
+    "Lift stacking",
+  );
   await page.getByLabel("Comparison simulation day").fill("300");
   await expect(page.locator(".comparison-scene canvas")).toHaveCount(2);
   await page
