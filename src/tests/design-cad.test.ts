@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { defaults, inputsSchema } from "@/types/model";
 import {
   continuousPile,
+  effectiveSlope,
+  groundElevation,
   envelopeVolume,
   meshVolume,
   resolveInputs,
@@ -98,13 +100,58 @@ describe("continuous pile sizing", () => {
   });
 });
 describe("CAD geometry", () => {
+  it("exports each cell and lift on separate CAD layers", () => {
+    const d = designDrawing(defaults);
+    const layers = new Set(d.faces.map((f) => f.layer));
+    expect(layers.has("HEAP_A1_L1")).toBe(true);
+    expect(layers.has("HEAP_B4_L2")).toBe(true);
+    expect(d.lines.some((l) => l.layer === "CELL_GRID")).toBe(true);
+    expect(d.labels.some((l) => l.value === "B4")).toBe(true);
+  });
+  it("respects repose and drainage grade without changing ore volume", () => {
+    const p = {
+      ...defaults,
+      stackingMode: "continuous" as const,
+      oreTonnes: 1000000,
+      slope: 1,
+      reposeAngle: 20,
+      drainageGrade: 3,
+      drainageDirection: "east" as const,
+    };
+    const d = designDrawing(p);
+    expect(effectiveSlope(p)).toBeCloseTo(
+      1 / Math.tan((20 * Math.PI) / 180),
+      10,
+    );
+    expect(d.inputs.slope).toBeCloseTo(effectiveSlope(p), 10);
+    expect(groundElevation(d.inputs, 0, 0)).toBeCloseTo(
+      d.inputs.length * 0.03,
+      8,
+    );
+    expect(groundElevation(d.inputs, d.inputs.length, 0)).toBe(0);
+    expect(cadVolume(d)).toBeCloseTo(p.oreTonnes / p.density, 3);
+    const ground = d.lines
+      .filter((l) => l.layer === "CELL_GRID")
+      .flatMap((l) => [l.start, l.end]);
+    expect(Math.max(...ground.map((p) => p[2]))).toBeCloseTo(
+      d.inputs.length * 0.03,
+      5,
+    );
+    expect(Math.min(...ground.map((p) => p[2]))).toBe(0);
+  });
   it("exports the design mesh at true scale with north/up axes and metric units", () => {
     const drawing = designDrawing(defaults),
       dxf = drawingDxf(drawing);
     const points = drawing.faces.flatMap((f) => f.vertices);
     expect(Math.max(...points.map((p) => p[0]))).toBe(defaults.length);
     expect(Math.min(...points.map((p) => p[1]))).toBe(-defaults.width);
-    expect(Math.max(...points.map((p) => p[2]))).toBe(defaults.maxHeight);
+    expect(Math.max(...points.map((p) => p[2]))).toBeCloseTo(
+      defaults.maxHeight +
+        (defaults.drainageGrade *
+          (defaults.width - defaults.slope * defaults.maxHeight)) /
+          100,
+      6,
+    );
     expect(cadVolume(drawing)).toBeCloseTo(heapDesign(defaults).volume, 5);
     expect(dxf).toContain("$INSUNITS\n70\n6\n");
     expect(dxf.match(/\n3DFACE\n/g)).toHaveLength(drawing.faces.length);

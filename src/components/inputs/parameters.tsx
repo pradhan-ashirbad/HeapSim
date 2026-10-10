@@ -53,6 +53,28 @@ const groups: Group[] = [
       { key: "maxHeight", label: "Maximum height", unit: "m" },
       { key: "maxLifts", label: "Planned lifts" },
       { key: "slope", label: "Overall side slope", unit: "H : 1V" },
+      {
+        key: "reposeAngle",
+        label: "Ore angle of repose",
+        unit: "°",
+        hint: "The outer face cannot be steeper than this measured ore angle. Supply a site-specific value.",
+      },
+      {
+        key: "drainageGrade",
+        label: "Drainage grade",
+        unit: "%",
+        hint: "Tilts the pad liner and ore geometry toward the collection side. This is not a hydraulic flow simulation.",
+      },
+      {
+        key: "drainageDirection",
+        label: "Drain toward",
+        options: [
+          ["south", "South edge"],
+          ["north", "North edge"],
+          ["east", "East edge"],
+          ["west", "West edge"],
+        ],
+      },
       { key: "aspectRatio", label: "Footprint aspect ratio", unit: "L/W" },
     ],
   },
@@ -381,7 +403,8 @@ export function Parameters() {
         </div>
       </div>
       <div className="sidebar-foot">
-        <span className="status-dot" /> Deterministic model <span>v1.0</span>
+        <span className="status-dot" /> Auto-saved in this browser{" "}
+        <span>v1.1</span>
       </div>
     </aside>
   );

@@ -46,6 +46,7 @@ const small: ProjectInputs = {
   cellLength: 50,
   cellWidth: 50,
   slope: 0,
+  reposeAngle: 90,
   oreTonnes: 220000,
   stackingRate: 10000,
   removalRate: 10000,

@@ -4,9 +4,34 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { Edges, OrbitControls, Line } from "@react-three/drei";
 import * as THREE from "three";
 import type { HeapDesign } from "@/engine/design";
+import { boundsAt, generateCells, groundElevation } from "@/engine/geometry";
 
 function Pile({ design }: { design: HeapDesign }) {
   const { inputs: p, height, mesh } = design;
+  const cellLines = useMemo(() => {
+    const cells = generateCells(p);
+    if (cells.length > 300) return [];
+    return cells.flatMap((cell) => {
+      const b = boundsAt(p, cell, height);
+      if (b.x1 <= b.x0 || b.y1 <= b.y0) return [];
+      return [
+        {
+          id: cell.id,
+          points: [
+            [b.x0, b.y0],
+            [b.x1, b.y0],
+            [b.x1, b.y1],
+            [b.x0, b.y1],
+            [b.x0, b.y0],
+          ].map(([x, y]): [number, number, number] => [
+            x,
+            height + groundElevation(p, x, y) + 0.08,
+            y,
+          ]),
+        },
+      ];
+    });
+  }, [p, height]);
   const { camera, size, invalidate } = useThree();
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
@@ -46,6 +71,14 @@ function Pile({ design }: { design: HeapDesign }) {
           />
           <Edges color="#e1ddb0" />
         </mesh>
+        {cellLines.map((line) => (
+          <Line
+            key={line.id}
+            points={line.points}
+            color="#4e684e"
+            lineWidth={1.2}
+          />
+        ))}
         <Line
           points={[
             [0, 0, -12],

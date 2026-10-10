@@ -42,7 +42,15 @@ describe.skipIf(process.platform !== "linux" || process.arch !== "x64")(
         const faces = db.entities.filter((e) => e.type === "3DFACE");
         const expected = designDrawing(inputs).faces;
         expect(faces).toHaveLength(expected.length);
-        expect(faces.every((f) => f.layer === "HEAP_DESIGN")).toBe(true);
+        expect(faces.every((f) => /^HEAP_[A-Z]+\d+_L\d+$/.test(f.layer))).toBe(
+          true,
+        );
+        expect(new Set(faces.map((f) => f.layer)).size).toBeGreaterThan(1);
+        expect(
+          db.entities
+            .filter((e) => e.type === "TEXT")
+            .some((e) => e.layer === "CELL_LABELS"),
+        ).toBe(true);
         const model = db.tables.BLOCK_RECORD.entries.filter(
           (b) => b.name === "*Model_Space",
         );

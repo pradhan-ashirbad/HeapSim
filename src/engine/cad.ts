@@ -7,7 +7,15 @@ import type {
   SimulationSnapshot,
 } from "@/types/model";
 import { heapDesign } from "./design";
-import { segmentMesh, type SolidMesh } from "./geometry";
+import {
+  boundsAt,
+  filledHeight,
+  generateCells,
+  generateSegments,
+  groundElevation,
+  segmentMesh,
+  type SolidMesh,
+} from "./geometry";
 import { disposalGeometry } from "./analysis";
 
 export type CadPoint = [number, number, number];
@@ -15,12 +23,61 @@ export interface CadFace {
   layer: string;
   vertices: [CadPoint, CadPoint, CadPoint];
 }
+export interface CadLine {
+  layer: string;
+  start: CadPoint;
+  end: CadPoint;
+}
+export interface CadLabel {
+  layer: string;
+  point: CadPoint;
+  value: string;
+  height: number;
+}
 export interface CadDrawing {
+  inputs: ProjectInputs;
   faces: CadFace[];
+  lines: CadLine[];
+  labels: CadLabel[];
   length: number;
   width: number;
   height: number;
   note: string;
+}
+const cadPoint = (p: ProjectInputs, x: number, y: number, z = 0): CadPoint => [
+  x,
+  -y,
+  z + groundElevation(p, x, y),
+];
+function outline(
+  p: ProjectInputs,
+  cell: HeapCell,
+  z: number,
+  layer: string,
+): CadLine[] {
+  const b = boundsAt(p, cell, z);
+  if (b.x1 <= b.x0 || b.y1 <= b.y0) return [];
+  const points = [
+    cadPoint(p, b.x0, b.y0, z),
+    cadPoint(p, b.x1, b.y0, z),
+    cadPoint(p, b.x1, b.y1, z),
+    cadPoint(p, b.x0, b.y1, z),
+  ];
+  return points.map((point, i) => ({
+    layer,
+    start: point,
+    end: points[(i + 1) % 4],
+  }));
+}
+function gridDrawing(p: ProjectInputs, cells: HeapCell[]) {
+  const lines = cells.flatMap((cell) => outline(p, cell, 0, "CELL_GRID"));
+  const labels = cells.map((cell): CadLabel => ({
+    layer: "CELL_LABELS",
+    point: cadPoint(p, cell.x + cell.length / 2, cell.y + cell.width / 2, 0.2),
+    value: cell.id,
+    height: Math.max(1, Math.min(cell.length, cell.width) / 8),
+  }));
+  return { lines, labels };
 }
 
 function facesFromMesh(
@@ -55,12 +112,57 @@ function facesFromMesh(
 }
 export function designDrawing(inputs: ProjectInputs): CadDrawing {
   const d = heapDesign(inputs);
+  const cells = generateCells(d.inputs),
+    segments = generateSegments(d.inputs, cells);
+  const byCell = new Map(cells.map((c) => [c.id, c]));
+  const faces = segments.flatMap((s) =>
+    facesFromMesh(
+      segmentMesh(d.inputs, byCell.get(s.cellId)!, s, s.capacity),
+      `HEAP_${s.cellId}_L${s.lift}`,
+      [byCell.get(s.cellId)!.x, s.z0, byCell.get(s.cellId)!.y],
+    ),
+  );
+  const grid = gridDrawing(d.inputs, cells);
+  const lines = [
+    ...grid.lines,
+    ...segments.flatMap((s) =>
+      outline(d.inputs, byCell.get(s.cellId)!, s.z1, `CELL_TOP_L${s.lift}`),
+    ),
+  ];
+  const labels = [
+    ...grid.labels,
+    ...segments
+      .filter((s) => s.topArea > 1)
+      .map((s): CadLabel => {
+        const b = boundsAt(d.inputs, byCell.get(s.cellId)!, s.z1);
+        return {
+          layer: "CELL_LABELS",
+          point: cadPoint(
+            d.inputs,
+            (b.x0 + b.x1) / 2,
+            (b.y0 + b.y1) / 2,
+            s.z1 + 0.15,
+          ),
+          value: `${s.cellId} L${s.lift}`,
+          height: Math.max(
+            1,
+            Math.min(
+              byCell.get(s.cellId)!.length,
+              byCell.get(s.cellId)!.width,
+            ) / 10,
+          ),
+        };
+      }),
+  ];
   return {
-    faces: facesFromMesh(d.mesh, "HEAP_DESIGN"),
+    inputs: d.inputs,
+    faces,
+    lines,
+    labels,
     length: d.inputs.length,
     width: d.inputs.width,
     height: d.height,
-    note: "Full design envelope - planning geometry - metres",
+    note: "Full pile design by cell and lift - planning geometry - metres",
   };
 }
 export function snapshotDrawing(
@@ -69,11 +171,27 @@ export function snapshotDrawing(
 ): CadDrawing {
   const p = result.inputs,
     cells = new Map(result.cells.map((c) => [c.id, c]));
+  const grid = gridDrawing(p, result.cells);
+  const lines = [...grid.lines];
+  const labels = [...grid.labels];
   const faces = result.segments.flatMap((s) => {
     const cell = cells.get(s.cellId)!;
+    const mass = snapshot.segments[s.index].tonnes;
+    if (mass > 0) {
+      const top = filledHeight(p, cell, s, mass);
+      lines.push(...outline(p, cell, top, `CELL_TOP_L${s.lift}`));
+      const b = boundsAt(p, cell, top);
+      if (b.x1 > b.x0 && b.y1 > b.y0)
+        labels.push({
+          layer: "CELL_LABELS",
+          point: cadPoint(p, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, top + 0.15),
+          value: `${s.cellId} L${s.lift} ${Math.round(mass)}t`,
+          height: Math.max(1, Math.min(cell.length, cell.width) / 10),
+        });
+    }
     return facesFromMesh(
-      segmentMesh(p, cell, s, snapshot.segments[s.index].tonnes),
-      `HEAP_L${s.lift}`,
+      segmentMesh(p, cell, s, mass),
+      `HEAP_${s.cellId}_L${s.lift}`,
       [cell.x, s.z0, cell.y],
     );
   });
@@ -115,7 +233,10 @@ export function snapshotDrawing(
     );
   }
   return {
+    inputs: p,
     faces,
+    lines,
+    labels,
     length: p.length,
     width: p.width,
     height: snapshot.metrics.height,
@@ -133,6 +254,8 @@ export function drawingDxf(d: CadDrawing) {
   const layers = [
     "PAD_BOUNDARY",
     "MEASUREMENTS",
+    ...new Set(d.lines.map((l) => l.layer)),
+    ...new Set(d.labels.map((l) => l.layer)),
     ...new Set(d.faces.map((f) => f.layer)),
   ];
   for (const layer of layers)
@@ -141,11 +264,19 @@ export function drawingDxf(d: CadDrawing) {
     const [a, b, c] = face.vertices.map((p) => point3d(...p));
     writer.add3dFace(a, b, c, c, { layerName: face.layer });
   }
+  for (const line of d.lines)
+    writer.addLine(point3d(...line.start), point3d(...line.end), {
+      layerName: line.layer,
+    });
+  for (const label of d.labels)
+    writer.addText(point3d(...label.point), label.height, label.value, {
+      layerName: label.layer,
+    });
   const corners: CadPoint[] = [
-    [0, 0, 0],
-    [d.length, 0, 0],
-    [d.length, -d.width, 0],
-    [0, -d.width, 0],
+    cadPoint(d.inputs, 0, 0),
+    cadPoint(d.inputs, d.length, 0),
+    cadPoint(d.inputs, d.length, d.width),
+    cadPoint(d.inputs, 0, d.width),
   ];
   for (let i = 0; i < 4; i++)
     writer.addLine(point3d(...corners[i]), point3d(...corners[(i + 1) % 4]), {

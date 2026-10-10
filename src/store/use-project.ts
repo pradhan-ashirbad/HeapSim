@@ -70,13 +70,88 @@ export const useProject = create<ProjectStore>()(
       name: "heapsim-project-v1",
       storage: createJSONStorage(() => localStorage),
       skipHydration: true,
-      partialize: (s) => ({ inputs: s.inputs, saved: s.saved }),
+      partialize: (s) => ({
+        inputs: s.inputs,
+        saved: s.saved,
+        day: s.day,
+        selectedCell: s.selectedCell,
+        selectedLift: s.selectedLift,
+        view: s.view,
+        grid: s.grid,
+        labels: s.labels,
+        transparent: s.transparent,
+        exploded: s.exploded,
+        vertical: s.vertical,
+        rulers: s.rulers,
+        camera: s.camera,
+        speed: s.speed,
+      }),
       merge: (persisted, current) => {
         const data = persisted as Partial<ProjectStore> | undefined;
         const parsed = inputsSchema.safeParse(data?.inputs);
         return {
           ...current,
           inputs: parsed.success ? parsed.data : current.inputs,
+          day:
+            Number.isInteger(data?.day) &&
+            data!.day! >= 0 &&
+            data!.day! <= 20000
+              ? data!.day!
+              : current.day,
+          selectedCell:
+            typeof data?.selectedCell === "string"
+              ? data.selectedCell
+              : current.selectedCell,
+          selectedLift:
+            Number.isInteger(data?.selectedLift) &&
+            data!.selectedLift! >= 1 &&
+            data!.selectedLift! <= 20
+              ? data!.selectedLift!
+              : null,
+          view: (
+            [
+              "3d",
+              "2d",
+              "split",
+              "elevation",
+              "section",
+              "lift",
+              "land",
+            ] as const
+          ).includes(data?.view as ViewMode)
+            ? data!.view!
+            : current.view,
+          grid: typeof data?.grid === "boolean" ? data.grid : current.grid,
+          labels:
+            typeof data?.labels === "boolean" ? data.labels : current.labels,
+          transparent:
+            typeof data?.transparent === "boolean"
+              ? data.transparent
+              : current.transparent,
+          exploded:
+            typeof data?.exploded === "boolean"
+              ? data.exploded
+              : current.exploded,
+          vertical:
+            typeof data?.vertical === "boolean"
+              ? data.vertical
+              : current.vertical,
+          rulers:
+            typeof data?.rulers === "boolean" ? data.rulers : current.rulers,
+          camera: [
+            "iso",
+            "top",
+            "north",
+            "south",
+            "east",
+            "west",
+            "focus",
+          ].includes(data?.camera ?? "")
+            ? data!.camera!
+            : current.camera,
+          speed: [1, 5, 20, 100].includes(data?.speed ?? -1)
+            ? data!.speed!
+            : current.speed,
           saved: Array.isArray(data?.saved)
             ? data!
                 .saved!.filter((s) => inputsSchema.safeParse(s.inputs).success)

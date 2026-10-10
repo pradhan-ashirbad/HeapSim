@@ -41,6 +41,9 @@ export function DesignPanel() {
           data-height={design.height}
           data-volume={design.volume}
           data-slope={p.slope}
+          data-repose={p.reposeAngle}
+          data-grade={p.drainageGrade}
+          data-drain={p.drainageDirection}
         >
           {webgl ? (
             <DesignScene design={design} />
@@ -73,6 +76,19 @@ export function DesignPanel() {
                 `${number(design.topLength, 2)} × ${number(design.topWidth, 2)} m`,
               ],
               ["Side slope", `${number(p.slope, 2)}H : 1V`],
+              [
+                "Face angle",
+                `${number((Math.atan(1 / p.slope) * 180) / Math.PI, 1)}°`,
+              ],
+              ["Ore angle of repose", `${number(p.reposeAngle, 1)}°`],
+              [
+                "Drainage grade",
+                `${number(p.drainageGrade, 2)}% to ${p.drainageDirection}`,
+              ],
+              [
+                "Pad elevation drop",
+                `${number((p.drainageGrade * (p.drainageDirection === "east" || p.drainageDirection === "west" ? p.length : p.width)) / 100, 2)} m`,
+              ],
               ["Footprint", `${number(design.area / 10000, 3)} ha`],
               ["Envelope volume", `${number(design.volume)} m³`],
               ["Envelope capacity", `${number(design.capacity)} t`],
@@ -88,8 +104,9 @@ export function DesignPanel() {
       <p className="design-note">
         Valid edits update the shape and measurements automatically. This is the
         full geometric envelope; the operating timeline below shows actual ore
-        placement. Footprint excludes infrastructure and blocked-cell
-        deductions.
+        placement. The angle of repose limits the outer face; the graded pad
+        falls toward the collection edge. Footprint excludes infrastructure and
+        blocked-cell deductions.
       </p>
     </section>
   );

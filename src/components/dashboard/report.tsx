@@ -163,6 +163,11 @@ export function Report() {
                     `${p.liftHeight} / ${p.maxHeight} m`,
                   ],
                   ["Overall slope", `${p.slope}H : 1V`],
+                  ["Ore angle of repose", `${p.reposeAngle}°`],
+                  [
+                    "Drainage grade",
+                    `${p.drainageGrade}% toward ${p.drainageDirection}`,
+                  ],
                   [
                     "Minimum stacking operating days",
                     number(Math.ceil(p.oreTonnes / p.stackingRate)),

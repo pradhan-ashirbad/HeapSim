@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Download, ArrowLeftRight } from "lucide-react";
 import { Header } from "./header";
 import { SceneOrFallback } from "./workspace";
@@ -157,7 +157,8 @@ function ComparisonCard({
 }
 export function Comparison() {
   const inputs = useProject((s) => s.inputs),
-    [day, setDay] = useState(220);
+    day = useProject((s) => s.day),
+    set = useProject((s) => s.set);
   const permanent = useScenario(inputs, "permanent"),
     newTsf = useScenario(inputs, "new-tsf");
   const models = {
@@ -250,7 +251,9 @@ export function Comparison() {
             min={0}
             max={maxDay}
             value={Math.min(day, maxDay)}
-            onChange={(e) => setDay(Number(e.target.value))}
+            onChange={(e) =>
+              set({ day: Number(e.target.value), playing: false })
+            }
           />
           <span>D{number(maxDay)}</span>
         </div>

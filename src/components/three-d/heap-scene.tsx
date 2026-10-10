@@ -24,6 +24,7 @@ import {
   filledHeight,
   boundsAt,
   envelopeVolume,
+  groundElevation,
 } from "@/engine/geometry";
 import { disposalFootprint, disposalGeometry } from "@/engine/analysis";
 import {
@@ -115,11 +116,31 @@ const OreSegment = memo(function OreSegment({
     offset = exploded ? (def.lift - 1) * 13 : 0;
   if (state.tonnes <= 0) return null;
   const topOutline: [number, number, number][] = [
-    [bounds.x0, height + 0.035, bounds.y0],
-    [bounds.x1, height + 0.035, bounds.y0],
-    [bounds.x1, height + 0.035, bounds.y1],
-    [bounds.x0, height + 0.035, bounds.y1],
-    [bounds.x0, height + 0.035, bounds.y0],
+    [
+      bounds.x0,
+      height + groundElevation(p, bounds.x0, bounds.y0) + 0.035,
+      bounds.y0,
+    ],
+    [
+      bounds.x1,
+      height + groundElevation(p, bounds.x1, bounds.y0) + 0.035,
+      bounds.y0,
+    ],
+    [
+      bounds.x1,
+      height + groundElevation(p, bounds.x1, bounds.y1) + 0.035,
+      bounds.y1,
+    ],
+    [
+      bounds.x0,
+      height + groundElevation(p, bounds.x0, bounds.y1) + 0.035,
+      bounds.y1,
+    ],
+    [
+      bounds.x0,
+      height + groundElevation(p, bounds.x0, bounds.y0) + 0.035,
+      bounds.y0,
+    ],
   ];
   return (
     <group position={[0, offset, 0]}>
@@ -171,12 +192,24 @@ const OreSegment = memo(function OreSegment({
             points={[
               [
                 bounds.x0 + (bounds.x1 - bounds.x0) * r,
-                height + 0.12,
+                height +
+                  groundElevation(
+                    p,
+                    bounds.x0 + (bounds.x1 - bounds.x0) * r,
+                    bounds.y0,
+                  ) +
+                  0.12,
                 bounds.y0,
               ],
               [
                 bounds.x0 + (bounds.x1 - bounds.x0) * r,
-                height + 0.12,
+                height +
+                  groundElevation(
+                    p,
+                    bounds.x0 + (bounds.x1 - bounds.x0) * r,
+                    bounds.y1,
+                  ) +
+                  0.12,
                 bounds.y1,
               ],
             ]}
@@ -188,7 +221,13 @@ const OreSegment = memo(function OreSegment({
         <Html
           position={[
             (bounds.x0 + bounds.x1) / 2,
-            height + 8,
+            height +
+              groundElevation(
+                p,
+                (bounds.x0 + bounds.x1) / 2,
+                (bounds.y0 + bounds.y1) / 2,
+              ) +
+              8,
             (bounds.y0 + bounds.y1) / 2,
           ]}
           center
@@ -397,6 +436,39 @@ function SceneContents({
       topByCell.set(def.cellId, def.lift);
   const selected = comparison ? null : ui.selectedCell;
   const sectionY = Math.ceil(p.width / 2 / p.cellWidth) * p.cellWidth;
+  const gradeAngle = Math.atan(p.drainageGrade / 100);
+  const tiltX =
+    p.drainageDirection === "south"
+      ? gradeAngle
+      : p.drainageDirection === "north"
+        ? -gradeAngle
+        : 0;
+  const tiltZ =
+    p.drainageDirection === "west"
+      ? gradeAngle
+      : p.drainageDirection === "east"
+        ? -gradeAngle
+        : 0;
+  const drainLine: [number, number, number][] =
+    p.drainageDirection === "south"
+      ? [
+          [0, groundElevation(p, 0, p.width) + 0.4, p.width],
+          [p.length, groundElevation(p, p.length, p.width) + 0.4, p.width],
+        ]
+      : p.drainageDirection === "north"
+        ? [
+            [0, groundElevation(p, 0, 0) + 0.4, 0],
+            [p.length, groundElevation(p, p.length, 0) + 0.4, 0],
+          ]
+        : p.drainageDirection === "east"
+          ? [
+              [p.length, groundElevation(p, p.length, 0) + 0.4, 0],
+              [p.length, groundElevation(p, p.length, p.width) + 0.4, p.width],
+            ]
+          : [
+              [0, groundElevation(p, 0, 0) + 0.4, 0],
+              [0, groundElevation(p, 0, p.width) + 0.4, p.width],
+            ];
   return (
     <>
       <color attach="background" args={["#17231f"]} />
@@ -427,40 +499,66 @@ function SceneContents({
           <boxGeometry args={[p.length + 12, 2, p.width + 12]} />
           <meshStandardMaterial color="#56614e" />
         </mesh>
+        <Line points={drainLine} color="#77cfdd" lineWidth={3} />
+        {!comparison && (
+          <Html
+            position={[drainLine[1][0], drainLine[1][1] + 2, drainLine[1][2]]}
+            center
+          >
+            <span className="scene-small-label">
+              COLLECTION EDGE · {p.drainageGrade}%{" "}
+              {p.drainageDirection.toUpperCase()}
+            </span>
+          </Html>
+        )}
         {result.cells
           .filter((c) => comparison || ui.view !== "section" || c.y < sectionY)
           .map((cell) => (
             <group key={cell.id}>
-              <mesh
+              <group
                 position={[
                   cell.x + cell.length / 2,
-                  0.02,
+                  groundElevation(
+                    p,
+                    cell.x + cell.length / 2,
+                    cell.y + cell.width / 2,
+                  ) + 0.02,
                   cell.y + cell.width / 2,
                 ]}
-                rotation={[-Math.PI / 2, 0, 0]}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  ui.select(cell.id);
-                }}
+                rotation={[0, 0, tiltZ]}
               >
-                <planeGeometry args={[cell.length, cell.width]} />
-                <meshStandardMaterial
-                  color={
-                    p.blockedCells.includes(cell.id)
-                      ? "#793d3d"
-                      : selected === cell.id
-                        ? "#778655"
-                        : "#495348"
-                  }
-                  roughness={1}
-                />
-                {ui.grid && <Edges color="#819077" lineWidth={0.7} />}
-              </mesh>
+                <mesh
+                  rotation={[-Math.PI / 2 + tiltX, 0, 0]}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    ui.select(cell.id);
+                  }}
+                >
+                  <planeGeometry args={[cell.length, cell.width]} />
+                  <meshStandardMaterial
+                    color={
+                      p.blockedCells.includes(cell.id)
+                        ? "#793d3d"
+                        : selected === cell.id
+                          ? "#778655"
+                          : "#495348"
+                    }
+                    roughness={1}
+                  />
+                  {ui.grid && <Edges color="#819077" lineWidth={0.7} />}
+                </mesh>
+              </group>
               {ui.labels && result.cells.length <= 200 && (
                 <Html
                   position={[
                     cell.x + cell.length / 2,
-                    (topByCell.get(cell.id) ?? 0) * p.liftHeight + 1,
+                    (topByCell.get(cell.id) ?? 0) * p.liftHeight +
+                      groundElevation(
+                        p,
+                        cell.x + cell.length / 2,
+                        cell.y + cell.width / 2,
+                      ) +
+                      1,
                     cell.y + cell.width / 2,
                   ]}
                   center

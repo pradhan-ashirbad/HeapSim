@@ -29,6 +29,11 @@ export const inputsSchema = z
     maxHeight: positive.max(200),
     maxLifts: z.number().int().min(1).max(20),
     slope: nonnegative.max(10),
+    reposeAngle: z.number().finite().min(1).max(90).default(37),
+    drainageGrade: z.number().finite().min(0).max(10).default(2),
+    drainageDirection: z
+      .enum(["south", "north", "east", "west"])
+      .default("south"),
     sizingMode: z.enum(["fixed-land", "fixed-ore"]),
     aspectRatio: positive.max(10),
     sequence: z.enum(["row", "column", "left", "right"]),
@@ -278,6 +283,9 @@ export const defaults: ProjectInputs = {
   maxHeight: 40,
   maxLifts: 4,
   slope: 3,
+  reposeAngle: 37,
+  drainageGrade: 2,
+  drainageDirection: "south",
   sizingMode: "fixed-land",
   aspectRatio: 4 / 3,
   sequence: "row",

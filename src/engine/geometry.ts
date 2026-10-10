@@ -10,6 +10,23 @@ export const nominalCellCapacity = (
   density: number,
 ) => length * width * height * density;
 export const setback = (height: number, slope: number) => height * slope;
+export const reposeSlope = (p: ProjectInputs) =>
+  p.reposeAngle === 90 ? 0 : 1 / Math.tan((p.reposeAngle * Math.PI) / 180);
+export const effectiveSlope = (p: ProjectInputs) =>
+  Math.max(p.slope, reposeSlope(p));
+export function groundElevation(p: ProjectInputs, x: number, y: number) {
+  const rate = p.drainageGrade / 100;
+  switch (p.drainageDirection) {
+    case "north":
+      return rate * y;
+    case "east":
+      return rate * (p.length - x);
+    case "west":
+      return rate * x;
+    default:
+      return rate * (p.width - y);
+  }
+}
 export const designHeight = (p: ProjectInputs) =>
   p.scenario === "permanent" && p.stackingMode === "continuous"
     ? p.maxHeight
@@ -62,28 +79,31 @@ export function requiredFootprint(
 // forcing the cap would reserve a footprint larger than the supplied ore volume.
 export function continuousPile(p: ProjectInputs) {
   const volume = oreVolume(p.oreTonnes, p.density);
-  const unitWidth = 2 * p.slope * Math.max(1, 1 / p.aspectRatio);
+  const slope = effectiveSlope(p);
+  const unitWidth = 2 * slope * Math.max(1, 1 / p.aspectRatio);
   const apexCoefficient = envelopeVolume(
     unitWidth * p.aspectRatio,
     unitWidth,
     1,
-    p.slope,
+    slope,
   );
   const height =
-    p.slope > 0
+    slope > 0
       ? Math.min(p.maxHeight, Math.cbrt(volume / apexCoefficient))
       : p.maxHeight;
   return {
-    ...requiredFootprint(volume, height, p.slope, p.aspectRatio),
+    ...requiredFootprint(volume, height, slope, p.aspectRatio),
     height,
     volume,
   };
 }
 export function resolveInputs(p: ProjectInputs): ProjectInputs {
+  const slope = effectiveSlope(p);
   if (p.scenario === "permanent" && p.stackingMode === "continuous") {
     const pile = continuousPile(p);
     return {
       ...p,
+      slope,
       length: pile.length,
       width: pile.width,
       maxHeight: pile.height,
@@ -92,7 +112,7 @@ export function resolveInputs(p: ProjectInputs): ProjectInputs {
       sizingMode: "fixed-ore",
     };
   }
-  if (p.sizingMode !== "fixed-ore") return { ...p };
+  if (p.sizingMode !== "fixed-ore") return { ...p, slope };
   const height =
     p.scenario === "permanent"
       ? designHeight(p)
@@ -100,10 +120,10 @@ export function resolveInputs(p: ProjectInputs): ProjectInputs {
   const f = requiredFootprint(
     p.oreTonnes / p.density,
     height,
-    p.slope,
+    slope,
     p.aspectRatio,
   );
-  return { ...p, length: f.length, width: f.width };
+  return { ...p, slope, length: f.length, width: f.width };
 }
 const rowName = (index: number): string =>
   index < 26
@@ -290,16 +310,16 @@ export function segmentMesh(
       y1 = Math.max(b.y0, b.y1);
     positions.push(
       b.x0 - cell.x,
-      z - segment.z0,
+      z - segment.z0 + groundElevation(p, b.x0, b.y0),
       b.y0 - cell.y,
       x1 - cell.x,
-      z - segment.z0,
+      z - segment.z0 + groundElevation(p, x1, b.y0),
       b.y0 - cell.y,
       x1 - cell.x,
-      z - segment.z0,
+      z - segment.z0 + groundElevation(p, x1, y1),
       y1 - cell.y,
       b.x0 - cell.x,
-      z - segment.z0,
+      z - segment.z0 + groundElevation(p, b.x0, y1),
       y1 - cell.y,
     );
   }

@@ -29,6 +29,18 @@ test("live no-lift sizing reshapes geometry and exports real CAD", async ({
   await expect(design).toHaveAttribute("data-slope", "2");
   await page.getByLabel("Maximum height", { exact: true }).fill("20");
   await expect(design).toHaveAttribute("data-height", "20");
+  const beforeRepose = Number(await design.getAttribute("data-width"));
+  await page.getByLabel("Ore angle of repose", { exact: true }).fill("12");
+  await expect
+    .poll(async () => Number(await design.getAttribute("data-slope")))
+    .toBeGreaterThan(4.7);
+  expect(Number(await design.getAttribute("data-width"))).toBeGreaterThan(
+    beforeRepose,
+  );
+  await page.getByLabel("Drainage grade", { exact: true }).fill("3");
+  await page.getByLabel("Drain toward", { exact: true }).selectOption("west");
+  await expect(design).toHaveAttribute("data-grade", "3");
+  await expect(design).toHaveAttribute("data-drain", "west");
   await expect(page.locator(".design-preview canvas")).toBeVisible();
   const event = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download CAD" }).click();
@@ -49,6 +61,9 @@ test("live no-lift sizing reshapes geometry and exports real CAD", async ({
   await dxf.saveAs("test-results/heapsim-day.dxf");
   expect(await readFile("test-results/heapsim-day.dxf", "utf8")).toContain(
     "3DFACE",
+  );
+  expect(await readFile("test-results/heapsim-day.dxf", "utf8")).toContain(
+    "CELL_GRID",
   );
   await page.screenshot({
     path: "test-results/heapsim-continuous.png",
@@ -198,12 +213,31 @@ test("invalid inputs are rejected; valid inputs regenerate and survive reload", 
   await expect(page.locator(".workspace-footer")).toContainText(
     "Operations complete",
   );
+  await page.getByLabel("Simulation day", { exact: true }).fill("120");
+  await page.getByRole("button", { name: "2D Plan", exact: true }).click();
+  await page.getByLabel("Playback speed").selectOption("20");
   await page.reload();
   await expect(page.getByLabel("Total ore", { exact: true })).toHaveValue(
     "100000",
   );
   await expect(page.locator(".workspace-footer")).toContainText(
     "Operations complete",
+  );
+  await expect(page.getByLabel("Simulation day", { exact: true })).toHaveValue(
+    "120",
+  );
+  await expect(
+    page.getByRole("button", { name: "2D Plan", exact: true }),
+  ).toHaveClass(/active/);
+  await expect(page.getByLabel("Playback speed")).toHaveValue("20");
+  const restored = await page.context().newPage();
+  await page.close();
+  await restored.goto("/");
+  await expect(
+    restored.getByLabel("Simulation day", { exact: true }),
+  ).toHaveValue("120");
+  await expect(restored.getByLabel("Total ore", { exact: true })).toHaveValue(
+    "100000",
   );
 });
 

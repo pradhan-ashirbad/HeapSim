@@ -3,7 +3,12 @@ import type {
   ProjectInputs,
   SimulationResults,
 } from "@/types/model";
-import { designHeight, envelopeVolume, requiredFootprint } from "./geometry";
+import {
+  designHeight,
+  envelopeVolume,
+  requiredFootprint,
+  reposeSlope,
+} from "./geometry";
 
 export function disposalCapacity(p: ProjectInputs) {
   if (p.scenario === "existing-tsf")
@@ -127,6 +132,26 @@ export function engineeringWarnings(
     p.scenario === "permanent"
       ? designHeight(p)
       : Math.min(p.liftHeight, p.maxHeight);
+  if (Math.abs(p.slope - reposeSlope(p)) < 1e-6)
+    add(
+      "repose",
+      "Angle of repose limits side slope",
+      `The ${p.reposeAngle}° angle gives a minimum ${p.slope.toFixed(2)}H:1V outer face. This is a static geometric limit; temporary working faces still require operational design.`,
+      "info",
+    );
+  if (p.drainageGrade === 0)
+    add(
+      "drainage",
+      "No pad drainage grade",
+      "The liner and pile base are level; gravity collection to the selected edge is not represented.",
+    );
+  else
+    add(
+      "drainage",
+      "Graded collection concept",
+      `The pad drops ${p.drainageGrade}% toward the ${p.drainageDirection} edge. Surface elevations are included in 3D and CAD; drainage capacity and solution flow paths still require hydraulic design.`,
+      "info",
+    );
   if (p.scenario === "permanent" && capacity + 0.01 < p.oreTonnes) {
     const f = requiredFootprint(
       p.oreTonnes / p.density,
