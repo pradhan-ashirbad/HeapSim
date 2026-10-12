@@ -52,7 +52,16 @@ const groups: Group[] = [
       { key: "liftHeight", label: "Lift height", unit: "m" },
       { key: "maxHeight", label: "Maximum height", unit: "m" },
       { key: "maxLifts", label: "Planned lifts" },
-      { key: "slope", label: "Overall side slope", unit: "H : 1V" },
+      {
+        key: "slopeMode",
+        label: "3D slope control",
+        options: [
+          ["repose", "Follow angle of repose (live face angle)"],
+          ["design", "Engineered side slope (repose as limit)"],
+        ],
+        hint: "Repose mode updates the drawn face directly. Engineered mode can draw a flatter face for the prescribed design slope.",
+      },
+      { key: "slope", label: "Overall side slope", unit: "H : 1V", hint: "Used in engineered side-slope mode only." },
       {
         key: "reposeAngle",
         label: "Ore angle of repose",
@@ -289,6 +298,7 @@ function ParameterField({ field }: { field: Field }) {
     return () => clearTimeout(timer);
   }, [draft, value, calculated]);
   if (
+    (field.key === "slope" && inputs.slopeMode === "repose") ||
     (field.key === "stackingMode" && inputs.scenario !== "permanent") ||
     (continuous && ["liftHeight", "maxLifts", "sizingMode"].includes(field.key))
   )
