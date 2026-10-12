@@ -99,6 +99,27 @@ describe("continuous pile sizing", () => {
     expect(inputsSchema.parse(old).stackingMode).toBe("lifts");
   });
 });
+describe("interactive repose-driven geometry", () => {
+  it("updates geometry in both directions with the repose angle", () => {
+    const base = { ...defaults, slopeMode: "repose" as const, slope: 5,
+      stackingMode: "continuous" as const, drainageGrade: 0 };
+    const steep = heapDesign({ ...base, reposeAngle: 45 });
+    const shallow = heapDesign({ ...base, reposeAngle: 25 });
+    expect(steep.inputs.slope).toBeCloseTo(1, 8);
+    expect(shallow.inputs.slope).toBeGreaterThan(steep.inputs.slope);
+    expect(shallow.area).toBeGreaterThan(steep.area);
+    expect(meshVolume(shallow.mesh)).toBeCloseTo(meshVolume(steep.mesh), 5);
+    expect(meshVolume(shallow.mesh)).toBeCloseTo(base.oreTonnes / base.density, 5);
+  });
+  it("keeps flatter engineered designs when design-limit mode is selected", () => {
+    const base = { ...defaults, slopeMode: "design" as const,
+      slope: 5, drainageGrade: 0 };
+    expect(effectiveSlope({ ...base, reposeAngle: 45 })).toBe(5);
+    expect(effectiveSlope({ ...base, reposeAngle: 30 })).toBe(5);
+    expect(effectiveSlope({ ...base, reposeAngle: 10 })).toBeGreaterThan(5);
+  });
+});
+
 describe("CAD geometry", () => {
   it("exports each cell and lift on separate CAD layers", () => {
     const d = designDrawing(defaults);
