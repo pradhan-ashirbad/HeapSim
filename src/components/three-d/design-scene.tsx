@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { Edges, OrbitControls, Line } from "@react-three/drei";
+import { Edges, OrbitControls, Line, Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { HeapDesign } from "@/engine/design";
 import { boundsAt, generateCells, groundElevation } from "@/engine/geometry";
@@ -32,6 +32,13 @@ function Pile({ design }: { design: HeapDesign }) {
       ];
     });
   }, [p, height]);
+  // True-scale live angle triangle on the west side, outside the solid mesh.
+  // Changes to repose or pad grade re-position all three endpoints.
+  const inset = p.slope * height;
+  const guideY = p.width / 2;
+  const toe = groundElevation(p, 0, guideY);
+  const crest = groundElevation(p, inset, guideY) + height;
+  const faceAngle = Math.atan2(crest - toe, inset) * 180 / Math.PI;
   const { camera, size, invalidate } = useThree();
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
@@ -71,6 +78,26 @@ function Pile({ design }: { design: HeapDesign }) {
           />
           <Edges color="#e1ddb0" />
         </mesh>
+        {height > 0 && inset > 0 && (
+          <>
+            <Line
+              points={[[0, toe + 0.4, guideY], [inset, crest + 0.4, guideY]]}
+              color="#ffcf72"
+              lineWidth={4}
+            />
+            <Line
+              points={[[0, toe + 0.4, guideY], [inset, toe + 0.4, guideY], [inset, crest + 0.4, guideY]]}
+              color="#ffd99b"
+              lineWidth={2}
+              dashed
+            />
+            <Html position={[inset * 0.58, (toe + crest) / 2 + 4, guideY]} center style={{ pointerEvents: "none" }}>
+              <span className="scene-small-label" data-testid="live-repose-face-angle">
+                FACE {faceAngle.toFixed(1)}° · REPOSE {p.reposeAngle.toFixed(1)}°
+              </span>
+            </Html>
+          </>
+        )}
         {cellLines.map((line) => (
           <Line
             key={line.id}
