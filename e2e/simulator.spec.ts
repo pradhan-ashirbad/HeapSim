@@ -1,3 +1,6 @@
+import { test, expect } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+
 test("repose angle dynamically changes real 3D footprint and visible angle guide", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("3D slope control").selectOption("repose");
@@ -15,8 +18,6 @@ test("repose angle dynamically changes real 3D footprint and visible angle guide
   await expect.poll(async () => Number(await design.getAttribute("data-volume"))).toBeCloseTo(3000000 / 1.6, 0);
 });
 
-import { test, expect } from "@playwright/test";
-import { readFile } from "node:fs/promises";
 
 test("live no-lift sizing reshapes geometry and exports real CAD", async ({
   page,
