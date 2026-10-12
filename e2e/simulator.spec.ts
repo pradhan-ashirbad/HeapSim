@@ -1,3 +1,20 @@
+test("repose angle dynamically changes real 3D footprint and visible angle guide", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("3D slope control").selectOption("repose");
+  await page.getByLabel("Permanent heap construction").selectOption("continuous");
+  const design = page.getByTestId("design-preview");
+  await expect(design).toHaveAttribute("data-slope-mode", "repose");
+  await page.getByLabel("Drainage grade", { exact: true }).fill("0");
+  await page.getByLabel("Ore angle of repose", { exact: true }).fill("45");
+  await expect.poll(async () => Number(await design.getAttribute("data-slope"))).toBeCloseTo(1, 2);
+  const steeperWidth = Number(await design.getAttribute("data-width"));
+  await page.getByLabel("Ore angle of repose", { exact: true }).fill("25");
+  await expect.poll(async () => Number(await design.getAttribute("data-slope"))).toBeGreaterThan(2);
+  await expect.poll(async () => Number(await design.getAttribute("data-width"))).toBeGreaterThan(steeperWidth);
+  await expect(page.getByTestId("live-repose-face-angle")).toContainText("REPOSE 25.0°");
+  await expect.poll(async () => Number(await design.getAttribute("data-volume"))).toBeCloseTo(3000000 / 1.6, 0);
+});
+
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
