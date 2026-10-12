@@ -523,6 +523,38 @@ function SceneContents({
           <meshStandardMaterial color="#56614e" />
         </mesh>
         <Line points={drainLine} color="#77cfdd" lineWidth={3} />
+        {!comparison && ui.rulers && snapshot.metrics.height > 0 && p.slope > 0 && (() => {
+          const h = Math.min(snapshot.metrics.height, p.maxHeight);
+          const run = p.slope * h;
+          const y = p.width / 2;
+          const toe = groundElevation(p, 0, y);
+          const crest = h + groundElevation(p, run, y);
+          const actualAngle = Math.atan2(crest - toe, run) * 180 / Math.PI;
+          return (
+            <>
+              <Line
+                points={[[0, toe + 0.6, y], [run, crest + 0.6, y]]}
+                color="#ffcf72"
+                lineWidth={3}
+              />
+              <Line
+                points={[[0, toe + 0.6, y], [run, toe + 0.6, y], [run, crest + 0.6, y]]}
+                color="#f7dba1"
+                lineWidth={1.5}
+                dashed
+              />
+              <Html
+                position={[run * 0.55, (toe + crest) / 2 + 7, y]}
+                center
+                style={{ pointerEvents: "none" }}
+              >
+                <span className="scene-small-label">
+                  FACE {actualAngle.toFixed(1)}° · REPOSE {p.reposeAngle.toFixed(1)}°
+                </span>
+              </Html>
+            </>
+          );
+        })()}
         {!comparison && ui.rulers && (
           <>
             <Line points={gradePoints} color="#77cfdd" lineWidth={2} />
