@@ -27,8 +27,12 @@ export function reposeSlope(p: ProjectInputs) {
     );
   return 1 / availableGradient;
 }
+// Repose mode redraws the actual face angle; the conservative design mode
+// retains any flatter engineered slope. Always derive this from raw inputs.
 export const effectiveSlope = (p: ProjectInputs) =>
-  Math.max(p.slope, reposeSlope(p));
+  p.slopeMode === "repose"
+    ? reposeSlope(p)
+    : Math.max(p.slope, reposeSlope(p));
 export function groundElevation(p: ProjectInputs, x: number, y: number) {
   const rate = p.drainageGrade / 100;
   switch (p.drainageDirection) {
