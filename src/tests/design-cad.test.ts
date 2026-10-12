@@ -33,7 +33,7 @@ describe("continuous pile sizing", () => {
   it.each([0, 1.5, 3, 6])(
     "conserves full project volume at slope %s",
     (slope) => {
-      const p = { ...defaults, stackingMode: "continuous" as const, slope };
+      const p = { ...defaults, slopeMode: "design" as const, stackingMode: "continuous" as const, slope };
       const d = heapDesign(p);
       expect(d.volume).toBeCloseTo(p.oreTonnes / p.density, 5);
       expect(meshVolume(d.mesh)).toBeCloseTo(d.volume, 5);
@@ -61,7 +61,7 @@ describe("continuous pile sizing", () => {
     },
   );
   it("responds to ore, density, slope and height without using lift count", () => {
-    const p = { ...defaults, stackingMode: "continuous" as const };
+    const p = { ...defaults, slopeMode: "design" as const, stackingMode: "continuous" as const };
     const base = continuousPile(p);
     expect(
       continuousPile({ ...p, oreTonnes: p.oreTonnes * 2 }).area,
