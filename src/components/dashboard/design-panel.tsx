@@ -44,6 +44,7 @@ export function DesignPanel() {
           data-volume={design.volume}
           data-slope={p.slope}
           data-repose={p.reposeAngle}
+          data-slope-mode={p.slopeMode}
           data-grade={p.drainageGrade}
           data-drain={p.drainageDirection}
         >
